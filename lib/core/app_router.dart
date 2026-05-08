@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../screens/splash_screen.dart';
 import '../screens/onboarding_1.dart';
@@ -82,16 +83,28 @@ class AppRouter {
         page = const LibraryScreen();
         break;
       case '/study-plan':
+      case '/study_plan_screen':
         page = const StudyPlanScreen();
         break;
       case '/scan':
         page = const ScanScreen();
         break;
       case '/ai-analysis':
-        page = const AIAnalysisScreen();
+        final args = s.arguments;
+        File? file;
+        String? displayName;
+        if (args is Map) {
+          final filePath = args['filePath'] as String?;
+          final fileName = args['fileName'] as String?;
+          if (filePath != null && fileName != null && filePath.isNotEmpty) {
+            file = File(filePath);
+            displayName = fileName;
+          }
+        }
+        page = AIAnalysisScreen(file: file, displayName: displayName);
         break;
       case '/audio':
-      case '/audio_screen': // دمجنا الحالتين مع بعض لأنهم بيفتحوا نفس الصفحة
+      case '/audio_screen':
         page = const AudioScreen();
         break;
       case '/settings':
@@ -107,6 +120,7 @@ class AppRouter {
         page = const ProgressScreen();
         break;
       case '/quiz':
+      case '/quiz_screen':
         page = const QuizScreen();
         break;
       case '/quiz-result':

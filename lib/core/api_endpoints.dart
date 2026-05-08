@@ -91,6 +91,15 @@ class DocumentEndpoints {
 
   /// POST multipart/form-data  field: 'file'
   static const String analyzeFile = '/Document/analyze';
+
+  /// GET — returns { filename, summary }
+  static const String summary = '/Document/summary';
+
+  /// GET — returns { rules: [...] }
+  static const String getRules = '/Document/get-rules';
+
+  /// GET — returns { definitions: [...] }
+  static const String getDefinitions = '/Document/get-definitions';
 }
 
 // ============================================================

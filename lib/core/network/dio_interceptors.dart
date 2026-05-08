@@ -136,7 +136,12 @@ class LoggingInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    dev.log('→ ${options.method} ${options.uri}\n  body: ${options.data}', name: _tag);
+    final body = options.data;
+    final bodyDesc = body is FormData
+        ? 'FormData(fields: ${body.fields.map((f) => f.key).toList()}, '
+            'files: ${body.files.map((f) => "${f.key}=${f.value.filename}").toList()})'
+        : '$body';
+    dev.log('→ ${options.method} ${options.uri}\n  body: $bodyDesc', name: _tag);
     handler.next(options);
   }
 

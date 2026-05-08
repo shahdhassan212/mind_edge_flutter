@@ -467,7 +467,7 @@ class _BookWidgetState extends State<BookWidget> with TickerProviderStateMixin {
     return ClipRect(
       child: Align(
         alignment: isLeft ? Alignment.centerRight : Alignment.centerLeft,
-        widthFactor: 0.5,
+        widthFactor: 0.90,
         child: Stack(
           children: [
             Container(
@@ -514,7 +514,7 @@ class _BookWidgetState extends State<BookWidget> with TickerProviderStateMixin {
       padding: const EdgeInsets.only(bottom: 5),
       child: FractionallySizedBox(
         widthFactor: widthFraction,
-        alignment: Alignment.centerLeft,
+        alignment: Alignment.centerRight,
         child: Container(
           height: 2,
           decoration: BoxDecoration(

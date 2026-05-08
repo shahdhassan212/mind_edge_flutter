@@ -1,10 +1,10 @@
-// ============================================================
-// AI Analysis Screen — with Formula Sheet tab
-// ============================================================
-
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../features/analysis/model/analysis_models.dart';
+import '../features/analysis/viewmodel/analysis_viewmodel.dart';
 
 // ─────────────────────────────────────────────────────────────
 // COLOR TOKENS
@@ -32,221 +32,93 @@ class _C {
   static const bubbleUser = Color(0xFF2A1A0E);
   static const bubbleAI = Color(0xFFFEFCF7);
   static const inputBg = Color(0xFFF4EDE0);
-
-  // Formula-specific
   static const formulaCardBg = Color(0xFFFAF6EE);
   static const formulaTagBg = Color(0xFF2A1A0E);
   static const formulaTagText = Color(0xFFE8B84B);
-  static const formulaCopyBg = Color(0xFFF0E8D8);
   static const skeletonBg = Color(0xFFEDE0C8);
-}
-
-// ─────────────────────────────────────────────────────────────
-// MODELS
-// ─────────────────────────────────────────────────────────────
-class FormulaItem {
-  final String id;
-  final String label; // e.g. "Rate Law"
-  final String expression; // e.g. "rate = k[A]^m[B]^n"
-  final String description; // short explanation
-  final String category; // e.g. "Kinetics", "Thermodynamics"
-  final List<String> variables; // e.g. ["k = rate constant", "m,n = orders"]
-
-  const FormulaItem({
-    required this.id,
-    required this.label,
-    required this.expression,
-    required this.description,
-    required this.category,
-    required this.variables,
-  });
-
-  factory FormulaItem.fromJson(Map<String, dynamic> j) => FormulaItem(
-        id: j['id']?.toString() ?? '',
-        label: j['label']?.toString() ?? '',
-        expression: j['expression']?.toString() ?? '',
-        description: j['description']?.toString() ?? '',
-        category: j['category']?.toString() ?? 'General',
-        variables: (j['variables'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
-      );
-
-  // Placeholder data — swap out when AI endpoint is ready
-  static List<FormulaItem> placeholders() => const [
-        FormulaItem(
-          id: '1',
-          label: 'Rate Law',
-          expression: 'rate = k[A]ᵐ[B]ⁿ',
-          description: 'Relates reaction rate to reactant concentrations and orders.',
-          category: 'Kinetics',
-          variables: ['k = rate constant', 'm = order w.r.t. A', 'n = order w.r.t. B'],
-        ),
-        FormulaItem(
-          id: '2',
-          label: 'Arrhenius Equation',
-          expression: 'k = Ae^(−Ea/RT)',
-          description: 'Describes dependence of rate constant on temperature.',
-          category: 'Kinetics',
-          variables: [
-            'A = frequency factor',
-            'Eₐ = activation energy',
-            'R = 8.314 J/mol·K',
-            'T = temperature (K)'
-          ],
-        ),
-        FormulaItem(
-          id: '3',
-          label: 'Gibbs Free Energy',
-          expression: 'ΔG = ΔH − TΔS',
-          description: 'Determines spontaneity of a reaction at constant T & P.',
-          category: 'Thermodynamics',
-          variables: ['ΔH = enthalpy change', 'T = temperature (K)', 'ΔS = entropy change'],
-        ),
-        FormulaItem(
-          id: '4',
-          label: 'Henderson–Hasselbalch',
-          expression: 'pH = pKₐ + log([A⁻]/[HA])',
-          description: 'Calculates pH of a buffer solution.',
-          category: 'Acid–Base',
-          variables: ['pKₐ = −log(Kₐ)', '[A⁻] = conjugate base', '[HA] = weak acid'],
-        ),
-        FormulaItem(
-          id: '5',
-          label: 'Beer–Lambert Law',
-          expression: 'A = εlc',
-          description: 'Relates absorbance to concentration in spectroscopy.',
-          category: 'Spectroscopy',
-          variables: [
-            'ε = molar absorptivity',
-            'l = path length (cm)',
-            'c = concentration (mol/L)'
-          ],
-        ),
-      ];
-}
-
-// ─────────────────────────────────────────────────────────────
-// REPOSITORY
-// ─────────────────────────────────────────────────────────────
-class _AnalysisRepo {
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://midedge.runasp.net',
-    headers: {'accept': '*/*'},
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 30),
-  ));
-
-  // ── Fetch extracted formulas ──────────────────────────────
-  // TODO: uncomment + map response when AI team delivers endpoint
-  // Expected response: { "formulas": [ { id, label, expression,
-  //   description, category, variables: [...] } ] }
-  Future<List<FormulaItem>> fetchFormulas(String fileId) async {
-    // final resp = await _dio.post<Map<String, dynamic>>(
-    //   '/api/AI/ExtractFormulas',
-    //   data: {'fileId': fileId},
-    // );
-    // final list = resp.data!['formulas'] as List<dynamic>;
-    // return list.map((e) => FormulaItem.fromJson(e)).toList();
-    await Future.delayed(const Duration(milliseconds: 600));
-    return FormulaItem.placeholders();
-  }
-
-  // ── Reuse existing endpoints ──────────────────────────────
-  Future<List<String>> listFiles() async {
-    final resp = await _dio.post<Map<String, dynamic>>('/api/File/ListFiles');
-    return (resp.data!['files'] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
-  }
+  static const errorBg = Color(0xFFFFF0F0);
+  static const errorBdr = Color(0xFFFFCCCC);
+  static const errorText = Color(0xFFB94040);
 }
 
 // ─────────────────────────────────────────────────────────────
 // SCREEN
 // ─────────────────────────────────────────────────────────────
-class AIAnalysisScreen extends StatefulWidget {
-  const AIAnalysisScreen({super.key});
+class AIAnalysisScreen extends ConsumerStatefulWidget {
+  /// The file sent to analyze-visuals (needed for multipart upload).
+  /// Optional — when null, the screen shows an empty state with an
+  /// upload button so the user can pick a file from inside the screen.
+  final File? file;
+
+  /// Display name shown in the hero card
+  final String? displayName;
+
+  const AIAnalysisScreen({
+    super.key,
+    this.file,
+    this.displayName,
+  });
+
   @override
-  State<AIAnalysisScreen> createState() => _AIAnalysisScreenState();
+  ConsumerState<AIAnalysisScreen> createState() => _AIAnalysisScreenState();
 }
 
-class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
-  int _tab = 0;
+class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
+  // Mutable so we can swap files via in-screen upload.
+  File? _file;
+  String? _displayName;
+  String? _fileName;
+
+  // UI state
+  int _tab = 0; // 0=Summary 1=Formulas 2=Key Terms
   bool _chatOpen = false;
   bool _aiTyping = false;
 
   final List<_Msg> _msgs = [];
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _scroll = ScrollController();
-  final _repo = _AnalysisRepo();
 
-  // Formulas state
-  List<FormulaItem> _formulas = [];
-  bool _formulasLoading = true;
-  String? _formulaFilter; // active category filter
-
-  static const _replies = [
-    'SN1 proceeds through a carbocation intermediate and follows first-order kinetics — only substrate concentration affects the rate.',
-    'Polar protic solvents like water and alcohols stabilise the carbocation, favouring SN1.',
-    'Tertiary substrates strongly prefer SN1; primary substrates favour SN2 because backside attack is less hindered.',
-    'SN2 is a one-step concerted mechanism — the nucleophile attacks as the leaving group departs, causing Walden inversion.',
-    'SN1 typically gives a racemic mixture because attack can occur from either face of the planar carbocation.',
-  ];
   int _replyIdx = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadFormulas();
-  }
-
-  Future<void> _loadFormulas() async {
-    setState(() => _formulasLoading = true);
-    try {
-      final items = await _repo.fetchFormulas('current');
-      if (mounted)
-        setState(() {
-          _formulas = items;
-          _formulasLoading = false;
-        });
-    } catch (_) {
-      if (mounted)
-        setState(() {
-          _formulas = FormulaItem.placeholders();
-          _formulasLoading = false;
-        });
+    if (widget.file != null) {
+      _setFile(widget.file!, widget.displayName ?? widget.file!.path.split(RegExp(r'[\\/]+')).last);
     }
   }
 
-  List<FormulaItem> get _filteredFormulas => _formulaFilter == null
-      ? _formulas
-      : _formulas.where((f) => f.category == _formulaFilter).toList();
+  void _setFile(File file, String displayName) {
+    _file = file;
+    _displayName = displayName;
+    _fileName = file.path.split(RegExp(r'[\\/]+')).last;
 
-  List<String> get _categories => _formulas.map((f) => f.category).toSet().toList();
-
-  // ── Chat ──────────────────────────────────────────────────
-  void _send() {
-    final t = _ctrl.text.trim();
-    if (t.isEmpty) return;
-    setState(() {
-      _msgs.add(_Msg(text: t, isUser: true));
-      _ctrl.clear();
-      _aiTyping = true;
-    });
-    _scrollDown();
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (!mounted) return;
-      setState(() {
-        _aiTyping = false;
-        _msgs.add(_Msg(text: _replies[_replyIdx % _replies.length], isUser: false));
-        _replyIdx++;
-      });
-      _scrollDown();
+    // Kick off all endpoints once a file is loaded.
+    // analyze-visuals → process-audio is sequential (summary needs document_name),
+    // formulas runs independently in parallel.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _fileName == null) return;
+      final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+      vm.loadVisualAnalysisThenSummary(file);
+      vm.loadFormulas();
     });
   }
 
-  void _scrollDown() => Future.delayed(const Duration(milliseconds: 80), () {
-        if (_scroll.hasClients) {
-          _scroll.animateTo(_scroll.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
-        }
-      });
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx', 'png', 'jpg', 'jpeg'],
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final picked = result.files.first;
+    if (picked.path == null || !mounted) return;
+    setState(() {
+      _tab = 0;
+      _msgs.clear();
+      _setFile(File(picked.path!), picked.name);
+    });
+  }
 
   @override
   void dispose() {
@@ -255,13 +127,20 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
     super.dispose();
   }
 
+
+  void _scrollDown() => Future.delayed(const Duration(milliseconds: 80), () {
+        if (_scroll.hasClients) {
+          _scroll.animateTo(_scroll.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
+        }
+      });
+
   // ─────────────────────────────────────────────────────────
   // BUILD
   // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 150, 98, 3),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -273,13 +152,20 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
         ),
         child: SafeArea(
           child: Column(children: [
-            _TopBar(onBack: () {
-              if (_chatOpen)
-                setState(() => _chatOpen = false);
-              else
-                Navigator.pop(context);
-            }),
-            Expanded(child: _chatOpen ? _buildChat() : _buildAnalysis()),
+            _TopBar(
+              onBack: () {
+                if (_chatOpen)
+                  setState(() => _chatOpen = false);
+                else
+                  Navigator.pop(context);
+              },
+              onUpload: _pickFile,
+            ),
+            Expanded(
+              child: _file == null
+                  ? _EmptyUpload(onPick: _pickFile)
+                  : (_chatOpen ? _buildChat() : _buildAnalysis()),
+            ),
             _buildBottomBar(context),
           ]),
         ),
@@ -291,34 +177,54 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
   // ANALYSIS VIEW
   // ─────────────────────────────────────────────────────────
   Widget _buildAnalysis() {
+    final state = ref.watch(analysisViewModelProvider(_fileName!));
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: _HeroCard(),
+          child: _HeroCard(
+            displayName: _displayName!,
+            visualStatus: state.visualStatus,
+            summaryStatus: state.summaryStatus,
+          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(children: const [
-            _StatTile(value: '12', label: 'Topics'),
-            SizedBox(width: 8),
-            _StatTile(value: '5', label: 'Concepts'),
-            SizedBox(width: 8),
-            _StatTile(value: '3', label: 'Formulas'),
+          child: Row(children: [
+            _StatTile(
+              value: state.visualData?.graphsAnalyzed.toString() ?? '–',
+              label: 'Graphs',
+            ),
+            const SizedBox(width: 8),
+            _StatTile(
+              value: state.formulas.length.toString(),
+              label: 'Formulas',
+            ),
+            const SizedBox(width: 8),
+            _StatTile(
+              value: state.visualData != null ? '✓' : '–',
+              label: 'Visuals',
+            ),
           ]),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: _TabBar(
             active: _tab,
-            labels: const ['Summary', 'Formulas', 'Key Terms'],
+            labels: const ['Summary', 'Formulas', 'Analysis'],
+            icons: const [
+              Icons.notes_rounded,
+              Icons.functions_rounded,
+              Icons.bar_chart_rounded,
+            ],
             onTap: (i) => setState(() => _tab = i),
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: _tab == 1 ? _buildFormulaSheet() : _ContentCard(tab: _tab),
+          child: _buildTabContent(state),
         ),
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -326,18 +232,7 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Wrap(
-            spacing: 7,
-            runSpacing: 7,
-            children: [
-              'SN1 Mechanism',
-              'SN2 Mechanism',
-              'Carbocations',
-              'Stereochemistry',
-              'Reaction Rates',
-              'Solvent Effects'
-            ].map((t) => _Chip(label: t)).toList(),
-          ),
+          child: _buildTopicsChips(state),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
@@ -356,17 +251,71 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // FORMULA SHEET
+  // TAB CONTENT ROUTER
   // ─────────────────────────────────────────────────────────
-  Widget _buildFormulaSheet() {
+  Widget _buildTabContent(AnalysisState state) {
+    switch (_tab) {
+      case 0:
+        return _buildSummaryTab(state);
+      case 1:
+        return _buildFormulaSheet(state);
+      case 2:
+        return _buildAnalysisTab(state);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // TAB 0 — SUMMARY (process-audio)
+  // ─────────────────────────────────────────────────────────
+  Widget _buildSummaryTab(AnalysisState state) {
+    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+
+    return _ContentShell(
+      label: 'AI Summary',
+      child: switch (state.summaryStatus) {
+        LoadStatus.idle || LoadStatus.loading => const _TextSkeleton(lines: 6),
+        LoadStatus.failure => _ErrorRetry(
+            message: state.summaryError ?? 'Failed to load summary',
+            onRetry: vm.retrySummary,
+          ),
+        LoadStatus.success => _MarkdownText(text: state.summaryData!.summary),
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // TAB 2 — VISUAL ANALYSIS (analyze-visuals)
+  // ─────────────────────────────────────────────────────────
+  Widget _buildAnalysisTab(AnalysisState state) {
+    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+
+    return _ContentShell(
+      label: 'Visual Analysis',
+      child: switch (state.visualStatus) {
+        LoadStatus.idle || LoadStatus.loading => const _TextSkeleton(lines: 5),
+        LoadStatus.failure => _ErrorRetry(
+            message: state.visualError ?? 'Failed to analyze visuals',
+            onRetry: () => vm.retryAll(_file!),
+          ),
+        LoadStatus.success => _VisualAnalysisBody(data: state.visualData!),
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // TAB 1 — FORMULA SHEET
+  // ─────────────────────────────────────────────────────────
+  Widget _buildFormulaSheet(AnalysisState state) {
+    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Header row
       Row(children: [
         const _SectionLabel('Formula Sheet'),
         const Spacer(),
-        // Refresh button
         GestureDetector(
-          onTap: _loadFormulas,
+          onTap: vm.loadFormulas,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -387,27 +336,25 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
           ),
         ),
       ]),
-
       const SizedBox(height: 10),
 
       // Category filter pills
-      if (_categories.isNotEmpty && !_formulasLoading) ...[
+      if (state.categories.isNotEmpty && state.formulaStatus == LoadStatus.success) ...[
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(children: [
             _FilterPill(
               label: 'All',
-              active: _formulaFilter == null,
-              onTap: () => setState(() => _formulaFilter = null),
+              active: state.formulaFilter == null,
+              onTap: () => vm.setFormulaFilter(null),
             ),
             const SizedBox(width: 6),
-            ..._categories.map((cat) => Padding(
+            ...state.categories.map((cat) => Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: _FilterPill(
                     label: cat,
-                    active: _formulaFilter == cat,
-                    onTap: () =>
-                        setState(() => _formulaFilter = _formulaFilter == cat ? null : cat),
+                    active: state.formulaFilter == cat,
+                    onTap: () => vm.setFormulaFilter(state.formulaFilter == cat ? null : cat),
                   ),
                 )),
           ]),
@@ -415,38 +362,13 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
         const SizedBox(height: 12),
       ],
 
-      // Loading skeleton
-      if (_formulasLoading)
+      if (state.formulaStatus == LoadStatus.loading)
         Column(children: List.generate(3, (_) => const _FormulaSkeleton()))
-
-      // Empty state
-      else if (_filteredFormulas.isEmpty)
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 32),
-          child: Column(children: [
-            Icon(Icons.functions_rounded, size: 28, color: _C.textMuted.withOpacity(0.5)),
-            const SizedBox(height: 10),
-            const Text('No formulas found',
-                style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 13,
-                    color: _C.textMuted,
-                    fontWeight: FontWeight.w400)),
-            const SizedBox(height: 4),
-            Text('Waiting for AI extraction…',
-                style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 11,
-                    color: _C.textMuted.withOpacity(0.6),
-                    fontWeight: FontWeight.w300)),
-          ]),
-        )
-
-      // Formula cards
+      else if (state.filteredFormulas.isEmpty)
+        _EmptyFormulas()
       else
         Column(
-          children: _filteredFormulas
+          children: state.filteredFormulas
               .map((f) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _FormulaCard(
@@ -475,6 +397,30 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
               .toList(),
         ),
     ]);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // TOPICS CHIPS — dynamic from correctedText keywords
+  // ─────────────────────────────────────────────────────────
+  Widget _buildTopicsChips(AnalysisState state) {
+    final topics = state.visualStatus == LoadStatus.success
+        ? _extractTopics(state.visualData!.correctedText)
+        : <String>['', '','',''];
+
+    return Wrap(
+      spacing: 7,
+      runSpacing: 7,
+      children: topics.map((t) => _Chip(label: t)).toList(),
+    );
+  }
+
+  /// Simple keyword extractor — pulls bold markdown headings as topic chips
+  List<String> _extractTopics(String text) {
+    final headings = RegExp(r'#{1,3} (.+)').allMatches(text);
+    final topics = headings.map((m) => m.group(1)!.trim()).take(6).toList();
+    return topics.isEmpty
+        ? ['', '', '', '']
+        : topics;
   }
 
   // ─────────────────────────────────────────────────────────
@@ -544,13 +490,13 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
                   hintText: 'Ask about this document...',
                   hintStyle: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: _C.textHint),
                 ),
-                onSubmitted: (_) => _send(),
+               // onSubmitted: (_) => _send(),
               ),
             ),
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: _send,
+          //  onTap: _send,
             child: Container(
               width: 38,
               height: 38,
@@ -663,7 +609,543 @@ class _AIAnalysisScreenState extends State<AIAnalysisScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────
-// FORMULA CARD
+// VISUAL ANALYSIS BODY
+// ─────────────────────────────────────────────────────────────
+class _VisualAnalysisBody extends StatelessWidget {
+  final VisualAnalysisModel data;
+  const _VisualAnalysisBody({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Raw extracted text
+      if (data.rawText.isNotEmpty) ...[
+        const _SectionLabel('Extracted Text'),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _C.formulaCardBg,
+            border: Border.all(color: _C.border),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            data.rawText,
+            style: const TextStyle(
+                fontFamily: 'DM Mono', fontSize: 11, color: _C.textBody, height: 1.6),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+
+      // Graph analyses
+      if (data.graphs.isNotEmpty) ...[
+        _SectionLabel('Graphs Analysed (${data.graphs.length})'),
+        const SizedBox(height: 8),
+        ...data.graphs.asMap().entries.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _GraphCard(index: e.key + 1, graph: e.value),
+            )),
+        const SizedBox(height: 8),
+      ],
+
+      // Corrected / full markdown
+      const _SectionLabel('Full Analysis'),
+      const SizedBox(height: 8),
+      _MarkdownText(text: data.correctedText),
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// GRAPH CARD
+// ─────────────────────────────────────────────────────────────
+class _GraphCard extends StatefulWidget {
+  final int index;
+  final GraphAnalysis graph;
+  const _GraphCard({required this.index, required this.graph});
+  @override
+  State<_GraphCard> createState() => _GraphCardState();
+}
+
+class _GraphCardState extends State<_GraphCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: _C.cardBg,
+          border: Border.all(color: _C.border),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+                color: _C.textDark.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))
+          ],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _C.formulaTagBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text('Graph ${widget.index}',
+                    style: const TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: _C.formulaTagText,
+                        letterSpacing: 0.4)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.graph.image,
+                  style: const TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 10,
+                      color: _C.textMuted,
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ),
+              AnimatedRotation(
+                duration: const Duration(milliseconds: 200),
+                turns: _expanded ? 0.5 : 0,
+                child: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: _C.textMuted),
+              ),
+            ]),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: _expanded
+                ? Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      widget.graph.analysis,
+                      style: const TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 12,
+                          color: _C.textBody,
+                          height: 1.6,
+                          fontWeight: FontWeight.w300),
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                    child: Text(
+                      widget.graph.analysis,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 12,
+                          color: _C.textMuted,
+                          height: 1.5,
+                          fontWeight: FontWeight.w300),
+                    ),
+                  ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// MARKDOWN TEXT — renders ## headings + **bold** simply
+// ─────────────────────────────────────────────────────────────
+class _MarkdownText extends StatelessWidget {
+  final String text;
+  const _MarkdownText({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = text.split('\n');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: lines.map((line) {
+        if (line.startsWith('# ')) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            child: Text(line.substring(2),
+                style: const TextStyle(
+                    fontFamily: 'Syne',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _C.textDark)),
+          );
+        }
+        if (line.startsWith('## ')) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 3),
+            child: Text(line.substring(3),
+                style: const TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _C.textDark)),
+          );
+        }
+        if (line.startsWith('### ')) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 2),
+            child: Text(line.substring(4),
+                style: const TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _C.textBody)),
+          );
+        }
+        if (line.trim().isEmpty) return const SizedBox(height: 4);
+        // Strip leading "- " or "N. "
+        final body = line.replaceFirst(RegExp(r'^[-•]\s+'), '');
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1.5),
+          child: Text(body,
+              style: const TextStyle(
+                  fontFamily: 'DM Sans',
+                  fontSize: 12.5,
+                  color: _C.textBody,
+                  height: 1.65,
+                  fontWeight: FontWeight.w300)),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// CONTENT SHELL
+// ─────────────────────────────────────────────────────────────
+class _ContentShell extends StatelessWidget {
+  final String label;
+  final Widget child;
+  const _ContentShell({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _C.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _C.border),
+          boxShadow: [
+            BoxShadow(
+                color: _C.textDark.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))
+          ],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _SectionLabel(label),
+          const SizedBox(height: 10),
+          child,
+        ]),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+// ERROR + RETRY
+// ─────────────────────────────────────────────────────────────
+class _ErrorRetry extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorRetry({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _C.errorBg,
+          border: Border.all(color: _C.errorBdr),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.error_outline_rounded, size: 14, color: _C.errorText),
+            const SizedBox(width: 6),
+            const Text('Failed to load',
+                style: TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _C.errorText)),
+          ]),
+          const SizedBox(height: 4),
+          Text(message,
+              style: const TextStyle(
+                  fontFamily: 'DM Sans',
+                  fontSize: 10.5,
+                  color: _C.errorText,
+                  fontWeight: FontWeight.w300)),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: onRetry,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: _C.textDark,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text('Retry',
+                  style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white)),
+            ),
+          ),
+        ]),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+// TEXT SKELETON (summary / analysis loading)
+// ─────────────────────────────────────────────────────────────
+class _TextSkeleton extends StatefulWidget {
+  final int lines;
+  const _TextSkeleton({required this.lines});
+  @override
+  State<_TextSkeleton> createState() => _TextSkeletonState();
+}
+
+class _TextSkeletonState extends State<_TextSkeleton> with SingleTickerProviderStateMixin {
+  late AnimationController _c;
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Opacity(
+          opacity: 0.4 + _c.value * 0.4,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: List.generate(widget.lines, (i) {
+              final widths = [0.9, 0.75, 0.88, 0.6, 0.82, 0.7];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                height: 11,
+                width: MediaQuery.of(context).size.width * widths[i % widths.length],
+                decoration:
+                    BoxDecoration(color: _C.skeletonBg, borderRadius: BorderRadius.circular(4)),
+              );
+            }),
+          ),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+// EMPTY FORMULAS
+// ─────────────────────────────────────────────────────────────
+class _EmptyFormulas extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(children: [
+          Icon(Icons.functions_rounded, size: 28, color: _C.textMuted.withOpacity(0.5)),
+          const SizedBox(height: 10),
+          const Text('No formulas found',
+              style: TextStyle(
+                  fontFamily: 'DM Sans',
+                  fontSize: 13,
+                  color: _C.textMuted,
+                  fontWeight: FontWeight.w400)),
+          const SizedBox(height: 4),
+          Text('Waiting for AI extraction…',
+              style: TextStyle(
+                  fontFamily: 'DM Sans',
+                  fontSize: 11,
+                  color: _C.textMuted.withOpacity(0.6),
+                  fontWeight: FontWeight.w300)),
+        ]),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+// HERO CARD — shows live status badges
+// ─────────────────────────────────────────────────────────────
+class _HeroCard extends StatelessWidget {
+  final String displayName;
+  final LoadStatus visualStatus;
+  final LoadStatus summaryStatus;
+  const _HeroCard({
+    required this.displayName,
+    required this.visualStatus,
+    required this.summaryStatus,
+  });
+
+  String get _statusLabel {
+    if (visualStatus == LoadStatus.loading || summaryStatus == LoadStatus.loading)
+      return 'Analysing…';
+    if (visualStatus == LoadStatus.failure || summaryStatus == LoadStatus.failure)
+      return 'Partial Results';
+    if (visualStatus == LoadStatus.success && summaryStatus == LoadStatus.success)
+      return 'Analysis Complete';
+    return 'Processing…';
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: _C.heroCard,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+                color: _C.heroCard.withOpacity(0.50), blurRadius: 36, offset: const Offset(0, 12))
+          ],
+        ),
+        child: Stack(clipBehavior: Clip.hardEdge, children: [
+          Positioned(
+              top: -30,
+              right: -30,
+              child: Container(
+                  width: 110,
+                  height: 110,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: _C.heroDeco1))),
+          Positioned(
+              bottom: -20,
+              right: 20,
+              child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: _C.heroDeco2))),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration:
+                      BoxDecoration(color: _C.goldDark, borderRadius: BorderRadius.circular(5)),
+                  child: const Icon(Icons.insert_drive_file_rounded, size: 11, color: Colors.white),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    displayName,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 9.5,
+                        color: _C.textMuted,
+                        letterSpacing: 0.4,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              Text(_statusLabel,
+                  style: const TextStyle(
+                      fontFamily: 'Syne',
+                      fontSize: 21,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -0.4,
+                      height: 1.2)),
+              const SizedBox(height: 12),
+              Row(children: [
+                _HeroBadge(
+                  label: visualStatus == LoadStatus.loading
+                      ? '⟳ Analyzing visuals'
+                      : visualStatus == LoadStatus.success
+                          ? '✦ Visuals ready'
+                          : '✕ Visual error',
+                  filled: visualStatus == LoadStatus.success,
+                ),
+                const SizedBox(width: 8),
+                _HeroBadge(
+                  label: summaryStatus == LoadStatus.loading
+                      ? '⟳ Summarizing'
+                      : summaryStatus == LoadStatus.success
+                          ? '✦ Summary ready'
+                          : '✕ Summary error',
+                  filled: summaryStatus == LoadStatus.success,
+                ),
+              ]),
+            ]),
+          ),
+        ]),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB BAR WITH ICONS
+// ─────────────────────────────────────────────────────────────
+class _TabBar extends StatelessWidget {
+  final int active;
+  final List<String> labels;
+  final List<IconData> icons;
+  final void Function(int) onTap;
+  const _TabBar(
+      {required this.active, required this.labels, required this.icons, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.55),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _C.border),
+        ),
+        child: Row(
+          children: List.generate(
+            labels.length,
+            (i) => Expanded(
+              child: GestureDetector(
+                onTap: () => onTap(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    color: active == i ? _C.textDark : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icons[i], size: 13, color: active == i ? _C.goldLight : _C.textMuted),
+                      const SizedBox(height: 2),
+                      Text(labels[i],
+                          style: TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: active == i ? Colors.white : _C.textMuted)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+// FORMULA CARD (unchanged logic, kept inline)
 // ─────────────────────────────────────────────────────────────
 class _FormulaCard extends StatefulWidget {
   final FormulaItem item;
@@ -704,17 +1186,13 @@ class _FormulaCardState extends State<_FormulaCard> {
           ],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // ── Top row ─────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 13, 14, 0),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Category tag
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _C.formulaTagBg,
-                  borderRadius: BorderRadius.circular(6),
-                ),
+                decoration:
+                    BoxDecoration(color: _C.formulaTagBg, borderRadius: BorderRadius.circular(6)),
                 child: Text(f.category,
                     style: const TextStyle(
                         fontFamily: 'DM Sans',
@@ -732,7 +1210,6 @@ class _FormulaCardState extends State<_FormulaCard> {
                         fontWeight: FontWeight.w600,
                         color: _C.textDark)),
               ),
-              // Expand chevron
               AnimatedRotation(
                 duration: const Duration(milliseconds: 200),
                 turns: _expanded ? 0.5 : 0,
@@ -740,17 +1217,13 @@ class _FormulaCardState extends State<_FormulaCard> {
               ),
             ]),
           ),
-
-          // ── Expression box ───────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: _C.textDark,
-                borderRadius: BorderRadius.circular(12),
-              ),
+              decoration:
+                  BoxDecoration(color: _C.textDark, borderRadius: BorderRadius.circular(12)),
               child: Row(children: [
                 Expanded(
                   child: Text(f.expression,
@@ -790,63 +1263,53 @@ class _FormulaCardState extends State<_FormulaCard> {
               ]),
             ),
           ),
-
-          // ── Description ──────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
             child: Text(f.description,
-                style: TextStyle(
+                style: const TextStyle(
                     fontFamily: 'DM Sans',
                     fontSize: 11.5,
                     color: _C.textMuted,
                     fontWeight: FontWeight.w300,
                     height: 1.5)),
           ),
-
-          // ── Expanded: variables + Ask AI ─────────────────
           AnimatedSize(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeInOut,
             child: _expanded
                 ? Padding(
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _SectionLabel('Variables'),
-                        const SizedBox(height: 6),
-                        ...f.variables.map((v) => Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Container(
-                                    margin: const EdgeInsets.only(top: 6),
-                                    width: 4,
-                                    height: 4,
-                                    decoration: const BoxDecoration(
-                                        color: _C.goldDark, shape: BoxShape.circle)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(v,
-                                      style: const TextStyle(
-                                          fontFamily: 'DM Sans',
-                                          fontSize: 11.5,
-                                          color: _C.textBody,
-                                          fontWeight: FontWeight.w300,
-                                          height: 1.5)),
-                                ),
-                              ]),
-                            )),
-                      ],
-                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const _SectionLabel('Variables'),
+                      const SizedBox(height: 6),
+                      ...f.variables.map((v) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Container(
+                                  margin: const EdgeInsets.only(top: 6),
+                                  width: 4,
+                                  height: 4,
+                                  decoration: const BoxDecoration(
+                                      color: _C.goldDark, shape: BoxShape.circle)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(v,
+                                    style: const TextStyle(
+                                        fontFamily: 'DM Sans',
+                                        fontSize: 11.5,
+                                        color: _C.textBody,
+                                        fontWeight: FontWeight.w300,
+                                        height: 1.5)),
+                              ),
+                            ]),
+                          )),
+                    ]),
                   )
                 : const SizedBox.shrink(),
           ),
-
-          // ── Bottom actions ────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 13),
             child: Row(children: [
-              // Ask AI button
               GestureDetector(
                 onTap: widget.onAskAI,
                 child: Container(
@@ -869,7 +1332,6 @@ class _FormulaCardState extends State<_FormulaCard> {
                 ),
               ),
               const Spacer(),
-              // Expand toggle text
               Text(
                 _expanded ? 'Hide details' : 'Show variables',
                 style: TextStyle(
@@ -986,11 +1448,12 @@ class _FilterPill extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SHARED WIDGETS (unchanged from original)
+// SHARED WIDGETS
 // ─────────────────────────────────────────────────────────────
 class _TopBar extends StatelessWidget {
   final VoidCallback onBack;
-  const _TopBar({required this.onBack});
+  final VoidCallback onUpload;
+  const _TopBar({required this.onBack, required this.onUpload});
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1006,8 +1469,84 @@ class _TopBar extends StatelessWidget {
                       color: _C.textDark)),
             ),
           ),
-          _IcoBtn(icon: Icons.upload_rounded, onTap: () {}),
+          _IcoBtn(icon: Icons.upload_rounded, onTap: onUpload),
         ]),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+// EMPTY STATE — shown when the screen opens with no file
+// ─────────────────────────────────────────────────────────────
+class _EmptyUpload extends StatelessWidget {
+  final VoidCallback onPick;
+  const _EmptyUpload({required this.onPick});
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 76,
+              height: 76,
+              decoration: const BoxDecoration(
+                color: _C.textDark,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.auto_awesome_rounded, size: 34, color: _C.goldLight),
+            ),
+            const SizedBox(height: 18),
+            const Text('Upload a file to analyze',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontFamily: 'Syne',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: _C.textDark)),
+            const SizedBox(height: 6),
+            const Text(
+              'Pick a PDF, document, or image and AI will summarise it, extract formulas, and analyse visuals.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontFamily: 'DM Sans',
+                  fontSize: 12,
+                  color: _C.textMuted,
+                  height: 1.55,
+                  fontWeight: FontWeight.w300),
+            ),
+            const SizedBox(height: 22),
+            GestureDetector(
+              onTap: onPick,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_C.audioBtnA, _C.audioBtnB],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: [
+                    BoxShadow(
+                        color: _C.goldDark.withOpacity(0.40),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.upload_rounded, size: 16, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Upload File',
+                      style: TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                ]),
+              ),
+            ),
+          ]),
+        ),
       );
 }
 
@@ -1032,73 +1571,6 @@ class _IcoBtn extends StatelessWidget {
           ),
           child: Icon(icon, size: 14, color: _C.textDark),
         ),
-      );
-}
-
-class _HeroCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: _C.heroCard,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-                color: _C.heroCard.withOpacity(0.50), blurRadius: 36, offset: const Offset(0, 12))
-          ],
-        ),
-        child: Stack(clipBehavior: Clip.hardEdge, children: [
-          Positioned(
-              top: -30,
-              right: -30,
-              child: Container(
-                  width: 110,
-                  height: 110,
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: _C.heroDeco1))),
-          Positioned(
-              bottom: -20,
-              right: 20,
-              child: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: _C.heroDeco2))),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration:
-                      BoxDecoration(color: _C.goldDark, borderRadius: BorderRadius.circular(5)),
-                  child: const Icon(Icons.insert_drive_file_rounded, size: 11, color: Colors.white),
-                ),
-                const SizedBox(width: 7),
-                const Text('Organic Chemistry Notes.pdf',
-                    style: TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 9.5,
-                        color: _C.textMuted,
-                        letterSpacing: 0.4,
-                        fontWeight: FontWeight.w600)),
-              ]),
-              const SizedBox(height: 10),
-              const Text('Analysis Complete',
-                  style: TextStyle(
-                      fontFamily: 'Syne',
-                      fontSize: 21,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: -0.4,
-                      height: 1.2)),
-              const SizedBox(height: 12),
-              Row(children: const [
-                _HeroBadge(label: '✦ 98.4% accuracy', filled: true),
-                SizedBox(width: 8),
-                _HeroBadge(label: '847 words', filled: false),
-              ]),
-            ]),
-          ),
-        ]),
       );
 }
 
@@ -1159,134 +1631,6 @@ class _StatTile extends StatelessWidget {
           ]),
         ),
       );
-}
-
-class _TabBar extends StatelessWidget {
-  final int active;
-  final List<String> labels;
-  final void Function(int) onTap;
-  const _TabBar({required this.active, required this.labels, required this.onTap});
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.55),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _C.border),
-        ),
-        child: Row(
-          children: List.generate(
-              labels.length,
-              (i) => Expanded(
-                    child: GestureDetector(
-                      onTap: () => onTap(i),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(vertical: 7),
-                        decoration: BoxDecoration(
-                          color: active == i ? _C.textDark : Colors.transparent,
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Center(
-                          child: Text(labels[i],
-                              style: TextStyle(
-                                  fontFamily: 'DM Sans',
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: active == i ? Colors.white : _C.textMuted)),
-                        ),
-                      ),
-                    ),
-                  )),
-        ),
-      );
-}
-
-class _ContentCard extends StatelessWidget {
-  final int tab;
-  const _ContentCard({required this.tab});
-  @override
-  Widget build(BuildContext context) {
-    const labels = ['AI Summary', 'Formulas', 'Key Terms'];
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _C.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _C.border),
-        boxShadow: [
-          BoxShadow(color: _C.textDark.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))
-        ],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _SectionLabel(labels[tab]),
-        const SizedBox(height: 10),
-        if (tab == 0) _buildSummary(),
-        if (tab == 2) _buildTerms(),
-      ]),
-    );
-  }
-
-  Widget _buildSummary() => const Text.rich(TextSpan(
-        style: TextStyle(
-            fontFamily: 'DM Sans',
-            fontSize: 13.5,
-            color: _C.textBody,
-            height: 1.7,
-            fontWeight: FontWeight.w300),
-        children: [
-          TextSpan(text: 'This document covers '),
-          TextSpan(
-              text: 'nucleophilic substitution reactions',
-              style: TextStyle(fontWeight: FontWeight.w600)),
-          TextSpan(
-              text:
-                  ', including SN1 and SN2 mechanisms. Key topics include carbocation stability, stereochemical outcomes, and the role of solvent polarity in determining the reaction pathway.'),
-        ],
-      ));
-
-  Widget _buildTerms() {
-    const terms = [
-      ('Nucleophile', 'Donates an electron pair to form a new bond'),
-      ('Carbocation', 'Positive carbon; stabilised by substitution'),
-      ('Inversion', 'Backside attack flips the configuration'),
-      ('Racemization', 'Equal R and S enantiomers from SN1'),
-    ];
-    return Column(
-      children: terms
-          .map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _C.goldDark.withOpacity(0.13),
-                      border: Border.all(color: _C.goldDark.withOpacity(0.28)),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(e.$1,
-                        style: const TextStyle(
-                            fontFamily: 'DM Sans',
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: _C.goldDark)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(e.$2,
-                        style: const TextStyle(
-                            fontFamily: 'DM Sans',
-                            fontSize: 11.5,
-                            color: _C.textMuted,
-                            height: 1.5,
-                            fontWeight: FontWeight.w300)),
-                  ),
-                ]),
-              ))
-          .toList(),
-    );
-  }
 }
 
 class _SectionLabel extends StatelessWidget {

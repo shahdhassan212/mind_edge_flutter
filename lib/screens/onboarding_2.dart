@@ -80,14 +80,13 @@ class OnboardingScreen2 extends StatelessWidget {
                           _ObCard2(cardWidth: cardW, waveformWidth: waveW),
                           Positioned(
                             bottom: -10,
-                            right: padLeft - 16,
+                            left: 5,
                             child: FloatWidget(
                               duration: AppDuration.floatC,
                               delay: const Duration(milliseconds: 500),
                               translateYMax: 3,
                               child: FloatingBadge(
                                 label: '▶ Playing',
-                                showLiveDot: true,
                                 // التعديل هنا: بنبعت الـ decoration اللي الـ Widget مستنياه
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(16),
@@ -109,7 +108,7 @@ class OnboardingScreen2 extends StatelessWidget {
                           ),
                           Positioned(
                               bottom: -10,
-                              right: padLeft - 16,
+                              right: 5,
                               child: FloatWidget(
                                   duration: AppDuration.floatC,
                                   delay: const Duration(milliseconds: 500),

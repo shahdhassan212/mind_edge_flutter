@@ -170,59 +170,86 @@ class ProgressScreen extends StatelessWidget {
                       ]),
                       const SizedBox(height: 12),
                       // Bar chart
+                      // Bar Chart (Responsive)
                       SizedBox(
-                        height: 64,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: List.generate(_days.length, (i) {
-                            final isLast = i == _days.length - 1;
-                            return Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(right: isLast ? 0 : 6),
-                                child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                                  Column(mainAxisSize: MainAxisSize.min, children: [
-                                    Container(
-                                        height: _bars[i][0],
-                                        decoration: BoxDecoration(
-                                            color: AppColors.cocoa.withOpacity(0.18),
-                                            borderRadius: const BorderRadius.vertical(
-                                                top: Radius.circular(4)))),
-                                    const SizedBox(height: 2),
-                                    Container(
-                                        height: isLast ? _bars[i][1] * 0.5 : _bars[i][1],
-                                        decoration: BoxDecoration(
-                                            gradient: const LinearGradient(
-                                                begin: Alignment.bottomCenter,
-                                                end: Alignment.topCenter,
-                                                colors: [AppColors.cocoa, AppColors.gold]),
-                                            borderRadius: const BorderRadius.vertical(
-                                                top: Radius.circular(4)),
-                                            boxShadow: isLast
-                                                ? []
-                                                : [
-                                                    BoxShadow(
-                                                        color: AppColors.cocoa.withOpacity(0.25),
-                                                        blurRadius: 12,
-                                                        offset: const Offset(0, 4))
-                                                  ]),
-                                        child: isLast
-                                            ? Opacity(opacity: 0.5, child: Container())
-                                            : null),
-                                  ]),
-                                  const SizedBox(height: 3),
-                                  Text(_days[i],
-                                      style: TextStyle(
-                                          fontFamily: 'DM Sans',
-                                          fontSize: 9,
-                                          color: isLast ? AppColors.cocoa : AppColors.muted,
-                                          fontWeight: isLast ? FontWeight.w600 : FontWeight.w400)),
-                                ]),
-                              ),
+                        height: 80,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final maxHeight = constraints.maxHeight - 18; // space for labels
+
+                            // flatten values to find max
+                            final allValues = _bars.expand((e) => e).toList();
+                            final maxValue = allValues.reduce((a, b) => a > b ? a : b);
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: List.generate(_days.length, (i) {
+                                final prev = _bars[i][0];
+                                final current = _bars[i][1];
+
+                                final prevH = (prev / maxValue) * maxHeight;
+                                final currH = (current / maxValue) * maxHeight;
+
+                                return Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            // Previous week bar
+                                            Expanded(
+                                              child: Container(
+                                                height: prevH,
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.cocoa.withOpacity(0.18),
+                                                  borderRadius: const BorderRadius.vertical(
+                                                    top: Radius.circular(4),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+
+                                            const SizedBox(width: 2),
+
+                                            // Current week bar
+                                            Expanded(
+                                              child: Container(
+                                                height: currH,
+                                                decoration: BoxDecoration(
+                                                  gradient: const LinearGradient(
+                                                    begin: Alignment.bottomCenter,
+                                                    end: Alignment.topCenter,
+                                                    colors: [AppColors.cocoa, AppColors.gold],
+                                                  ),
+                                                  borderRadius: const BorderRadius.vertical(
+                                                    top: Radius.circular(4),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _days[i],
+                                          style: const TextStyle(
+                                            fontFamily: 'DM Sans',
+                                            fontSize: 9,
+                                            color: AppColors.muted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
                             );
-                          }),
+                          },
                         ),
                       ),
-                      const SizedBox(height: 8),
                       // Legend
                       Row(children: [
                         Container(

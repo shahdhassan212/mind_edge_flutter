@@ -9,7 +9,8 @@
       "Bash(flutter build:*)",
       "Bash(grep -E \"\\\\.\\(dart|yaml\\)$\")",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\hp\\\\Desktop\\\\mind_edge\" -Recurse -File)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\hp\\\\Desktop\\\\mind_edge\\\\lib\" -Recurse -Filter \"*upload*\" -File)"
     ]
   }
 }

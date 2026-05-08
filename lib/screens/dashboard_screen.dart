@@ -440,7 +440,7 @@ class DashboardScreen extends ConsumerWidget {
                   if (i == 0) Navigator.pushNamed(context, '/study-plan'); // Plans
                   if (i == 1) Navigator.pushNamed(context, '/library'); // Library
                   if (i == 2) Navigator.pushNamed(context, '/scan'); // + FAB
-                  if (i == 3) Navigator.pushNamed(context, '/ai-analysis'); // 🤖 AI ← هنا التعديل
+                  if (i == 3) Navigator.pushNamed(context, '/ai-analysis'); // 🤖 AI
                   if (i == 4) Navigator.pushNamed(context, '/settings'); // Settings
                 },
               ),
