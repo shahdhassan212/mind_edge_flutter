@@ -23,16 +23,16 @@ import '../screens/quiz_result_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/library_screen.dart';
 import '../screens/ai_analysis_screen.dart';
+import '../screens/ai_chat_screen.dart'; // ← NEW
 
 class AppRouter {
-  
   static const String initialRoute = '/';
 
   static Route<dynamic>? onGenerateRoute(RouteSettings s) {
     Widget? page;
 
     switch (s.name) {
-      // ── Auth Flow
+      // ── Auth Flow ──────────────────────────────────────────
       case '/':
         page = const SplashScreen();
         break;
@@ -56,7 +56,7 @@ class AppRouter {
         page = VerifyEmailScreen(email: email);
         break;
 
-      // ── Forgot Password Flow
+      // ── Forgot Password Flow ───────────────────────────────
       case '/forgot-email':
         page = const ForgotPasswordEmailScreen();
         break;
@@ -75,7 +75,7 @@ class AppRouter {
         page = const ForgotPasswordSuccessScreen();
         break;
 
-      // ── Main App Features
+      // ── Main App Features ──────────────────────────────────
       case '/dashboard':
         page = const DashboardScreen();
         break;
@@ -83,26 +83,39 @@ class AppRouter {
         page = const LibraryScreen();
         break;
       case '/study-plan':
-      case '/study_plan_screen':
         page = const StudyPlanScreen();
         break;
       case '/scan':
         page = const ScanScreen();
         break;
+
+      // AIAnalysisScreen — filePath/fileName are optional.
+      // Without arguments the screen shows an upload empty state.
       case '/ai-analysis':
-        final args = s.arguments;
-        File? file;
-        String? displayName;
-        if (args is Map) {
-          final filePath = args['filePath'] as String?;
-          final fileName = args['fileName'] as String?;
-          if (filePath != null && fileName != null && filePath.isNotEmpty) {
-            file = File(filePath);
-            displayName = fileName;
-          }
+        final raw = s.arguments;
+        String? filePath;
+        String? fileName;
+        if (raw is Map<String, String?>) {
+          filePath = raw['filePath'];
+          fileName = raw['fileName'];
+        } else if (raw is Map<String, dynamic>) {
+          filePath = raw['filePath'] as String?;
+          fileName = raw['fileName'] as String?;
         }
-        page = AIAnalysisScreen(file: file, displayName: displayName);
+        page = AIAnalysisScreen(
+          file: filePath != null ? File(filePath) : null,
+          displayName: fileName ?? filePath?.split('/').last,
+        );
         break;
+
+      // AIChatScreen — receives fileName from AIAnalysisScreen ← NEW
+      case '/ai-chat':
+        final args = s.arguments as Map<String, dynamic>? ?? {};
+        page = AIChatScreen(
+          fileName: args['fileName'] as String? ?? '',
+        );
+        break;
+
       case '/audio':
       case '/audio_screen':
         page = const AudioScreen();
@@ -120,14 +133,12 @@ class AppRouter {
         page = const ProgressScreen();
         break;
       case '/quiz':
-      case '/quiz_screen':
         page = const QuizScreen();
         break;
       case '/quiz-result':
         page = const QuizResultScreen();
         break;
-      
-      // حالة احتياطية لو المسار مش موجود
+
       default:
         page = null;
     }
@@ -139,10 +150,7 @@ class AppRouter {
       pageBuilder: (context, animation, secondaryAnimation) => page!,
       transitionsBuilder: (context, anim, secondaryAnimation, child) {
         return FadeTransition(
-          opacity: CurvedAnimation(
-            parent: anim,
-            curve: Curves.easeOut,
-          ),
+          opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
           child: child,
         );
       },

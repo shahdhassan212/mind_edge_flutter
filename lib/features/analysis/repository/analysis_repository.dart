@@ -11,6 +11,7 @@ class AnalysisRepository {
 
   Dio get _dio => _client.dio;
 
+  // ── Safe JSON map cast ────────────────────────────────────
   Map<String, dynamic> _asJsonMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;
     if (data is Map) return Map<String, dynamic>.from(data);
@@ -24,7 +25,6 @@ class AnalysisRepository {
   }
 
   // ── POST /api/Document/analyze-visuals ───────────────────
-
   Future<VisualAnalysisModel> analyzeVisuals(File file) async {
     final filename = file.path.split(RegExp(r'[\\/]+')).last;
 
@@ -36,7 +36,7 @@ class AnalysisRepository {
       '/api/Document/analyze-visuals',
       data: formData,
       options: Options(
-        headers: {"accept": "application/json"},
+        headers: {'accept': 'application/json'},
         responseType: ResponseType.json,
       ),
     );
@@ -45,13 +45,15 @@ class AnalysisRepository {
   }
 
   // ── POST /api/Document/process-audio ─────────────────────
-  // fileName = the document_name returned from analyze-visuals
-  Future<AudioSummaryModel> processAudio(String fileName) async {
+  Future<AudioSummaryModel> processAudio(
+    String fileName, {
+    bool tts = true,
+  }) async {
     final resp = await _dio.post(
       '/api/Document/process-audio',
-      queryParameters: {'fileName': fileName},
+      queryParameters: {'fileName': fileName, 'tts': tts},
       options: Options(
-        headers: {"accept": "application/json"},
+        headers: {'accept': 'application/json'},
         responseType: ResponseType.json,
       ),
     );
@@ -59,17 +61,51 @@ class AnalysisRepository {
     return AudioSummaryModel.fromJson(_asJsonMap(resp.data));
   }
 
-  // ── Formula extraction (placeholder → swap when ready) ───
-  Future<List<FormulaItem>> fetchFormulas(String fileId) async {
-    // TODO: uncomment when AI team delivers /api/AI/ExtractFormulas
-    // final resp = await _dio.post<Map<String, dynamic>>(
-    //   '/api/AI/ExtractFormulas',
-    //   data: {'fileId': fileId},
-    // );
-    // return (resp.data!['formulas'] as List)
-    //     .map((e) => FormulaItem.fromJson(e))
-    //     .toList();
-    await Future.delayed(const Duration(milliseconds: 500));
-    return FormulaItem.placeholders();
+  // ── GET /api/Document/get-rules ──────────────────────────
+  // Response shape:
+  //   { "rules": "<JSON-encoded string>" }
+  // The inner string is itself a JSON object:
+  //   { "filename": "...", "rules": "<markdown or rule text>" }
+  Future<RulesModel> fetchRules(String filename) async {
+    final resp = await _dio.get(
+      '/api/Document/get-rules',
+      queryParameters: {'filename': filename},
+      options: Options(
+        headers: {'accept': '*/*'},
+        responseType: ResponseType.json,
+      ),
+    );
+
+    final outer = _asJsonMap(resp.data);
+
+    // The value of "rules" key is a JSON-encoded string — decode it
+    final innerRaw = outer['rules'];
+    final inner = _asJsonMap(innerRaw); // handles both String and Map
+
+    return RulesModel.fromJson(inner);
+  }
+
+  // ── GET /api/Document/get-definitions ────────────────────
+  // Response shape:
+  //   { "definitions": "<JSON-encoded string>" }
+  // The inner string is itself a JSON object:
+  //   { "filename": "...", "definitions": "<markdown string>" }
+  Future<DefinitionsModel> fetchDefinitions(String filename) async {
+    final resp = await _dio.get(
+      '/api/Document/get-definitions',
+      queryParameters: {'filename': filename},
+      options: Options(
+        headers: {'accept': '*/*'},
+        responseType: ResponseType.json,
+      ),
+    );
+
+    final outer = _asJsonMap(resp.data);
+
+    // The value of "definitions" key is a JSON-encoded string — decode it
+    final innerRaw = outer['definitions'];
+    final inner = _asJsonMap(innerRaw);
+
+    return DefinitionsModel.fromJson(inner);
   }
 }

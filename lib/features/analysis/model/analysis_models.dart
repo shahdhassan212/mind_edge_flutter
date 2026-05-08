@@ -32,7 +32,8 @@ class VisualAnalysisModel {
     required this.graphs,
   });
 
-  factory VisualAnalysisModel.fromJson(Map<String, dynamic> j) => VisualAnalysisModel(
+  factory VisualAnalysisModel.fromJson(Map<String, dynamic> j) =>
+      VisualAnalysisModel(
         status: j['status']?.toString() ?? '',
         documentName: j['document_name']?.toString() ?? '',
         rawText: j['raw_text']?.toString() ?? '',
@@ -56,96 +57,71 @@ class AudioSummaryModel {
     this.audioUrl,
   });
 
-  factory AudioSummaryModel.fromJson(Map<String, dynamic> j) => AudioSummaryModel(
+  factory AudioSummaryModel.fromJson(Map<String, dynamic> j) =>
+      AudioSummaryModel(
         filename: j['filename']?.toString() ?? '',
         summary: j['summary']?.toString() ?? '',
         audioUrl: j['audio_url']?.toString(),
       );
 }
 
-// ── Formula Sheet ─────────────────────────────────────────────
-class FormulaItem {
-  final String id;
-  final String label;
-  final String expression;
-  final String description;
-  final String category;
-  final List<String> variables;
+// ── Rules (get-rules) ─────────────────────────────────────────
+// Response after double-decode:
+//   { "filename": "...", "rules": "<rule text / markdown>" }
+//
+// The "rules" value is a plain string — could be a single rule,
+// multiple rules separated by newlines, or light markdown.
+// We split on newlines and render each non-empty line as a rule card.
+class RulesModel {
+  final String filename;
 
-  const FormulaItem({
-    required this.id,
-    required this.label,
-    required this.expression,
-    required this.description,
-    required this.category,
-    required this.variables,
-  });
+  /// Raw rules string exactly as returned by the API.
+  final String rawRules;
 
-  factory FormulaItem.fromJson(Map<String, dynamic> j) => FormulaItem(
-        id: j['id']?.toString() ?? '',
-        label: j['label']?.toString() ?? '',
-        expression: j['expression']?.toString() ?? '',
-        description: j['description']?.toString() ?? '',
-        category: j['category']?.toString() ?? 'General',
-        variables: (j['variables'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+  const RulesModel({required this.filename, required this.rawRules});
+
+  factory RulesModel.fromJson(Map<String, dynamic> j) => RulesModel(
+        filename: j['filename']?.toString() ?? '',
+        rawRules: j['rules']?.toString() ?? '',
       );
 
-  static List<FormulaItem> placeholders() => const [
-        FormulaItem(
-          id: '1',
-          label: 'Rate Law',
-          expression: 'rate = k[A]ᵐ[B]ⁿ',
-          description: 'Relates reaction rate to reactant concentrations and orders.',
-          category: 'Kinetics',
-          variables: ['k = rate constant', 'm = order w.r.t. A', 'n = order w.r.t. B'],
-        ),
-        FormulaItem(
-          id: '2',
-          label: 'Arrhenius Equation',
-          expression: 'k = Ae^(−Ea/RT)',
-          description: 'Describes dependence of rate constant on temperature.',
-          category: 'Kinetics',
-          variables: [
-            'A = frequency factor',
-            'Eₐ = activation energy',
-            'R = 8.314 J/mol·K',
-            'T = temperature (K)',
-          ],
-        ),
-        FormulaItem(
-          id: '3',
-          label: 'Gibbs Free Energy',
-          expression: 'ΔG = ΔH − TΔS',
-          description: 'Determines spontaneity of a reaction at constant T & P.',
-          category: 'Thermodynamics',
-          variables: ['ΔH = enthalpy change', 'T = temperature (K)', 'ΔS = entropy change'],
-        ),
-        FormulaItem(
-          id: '4',
-          label: 'Henderson–Hasselbalch',
-          expression: 'pH = pKₐ + log([A⁻]/[HA])',
-          description: 'Calculates pH of a buffer solution.',
-          category: 'Acid–Base',
-          variables: ['pKₐ = −log(Kₐ)', '[A⁻] = conjugate base', '[HA] = weak acid'],
-        ),
-        FormulaItem(
-          id: '5',
-          label: 'Beer–Lambert Law',
-          expression: 'A = εlc',
-          description: 'Relates absorbance to concentration in spectroscopy.',
-          category: 'Spectroscopy',
-          variables: [
-            'ε = molar absorptivity',
-            'l = path length (cm)',
-            'c = concentration (mol/L)',
-          ],
-        ),
-      ];
+  /// Split the raw string into individual rule entries.
+  /// Each non-blank line is treated as one rule.
+  List<String> get ruleLines => rawRules
+      .split('\n')
+      .map((l) => l.trim())
+      .where((l) => l.isNotEmpty)
+      .toList();
 }
 
-// ── Unified Screen State ──────────────────────────────────────
+// ── Definitions (get-definitions) ────────────────────────────
+// Response after double-decode:
+//   { "filename": "...", "definitions": "<markdown string>" }
+//
+// The "definitions" value is a markdown string — rendered as-is
+// using the existing _MarkdownText widget.
+class DefinitionsModel {
+  final String filename;
+
+  /// Raw markdown string exactly as returned by the API.
+  final String markdownContent;
+
+  const DefinitionsModel({
+    required this.filename,
+    required this.markdownContent,
+  });
+
+  factory DefinitionsModel.fromJson(Map<String, dynamic> j) =>
+      DefinitionsModel(
+        filename: j['filename']?.toString() ?? '',
+        markdownContent: j['definitions']?.toString() ?? '',
+      );
+}
+
+// ── Load status ───────────────────────────────────────────────
 enum LoadStatus { idle, loading, success, failure }
 
+// ── Unified Screen State ──────────────────────────────────────
 class AnalysisState {
   // Visual analysis
   final LoadStatus visualStatus;
@@ -157,10 +133,15 @@ class AnalysisState {
   final AudioSummaryModel? summaryData;
   final String? summaryError;
 
-  // Formula sheet
-  final LoadStatus formulaStatus;
-  final List<FormulaItem> formulas;
-  final String? formulaFilter;
+  // Rules  (replaces FormulaItem list)
+  final LoadStatus rulesStatus;
+  final RulesModel? rulesData;
+  final String? rulesError;
+
+  // Definitions  (replaces DefinitionItem list)
+  final LoadStatus definitionStatus;
+  final DefinitionsModel? definitionsData;
+  final String? definitionError;
 
   const AnalysisState({
     this.visualStatus = LoadStatus.idle,
@@ -169,9 +150,12 @@ class AnalysisState {
     this.summaryStatus = LoadStatus.idle,
     this.summaryData,
     this.summaryError,
-    this.formulaStatus = LoadStatus.idle,
-    this.formulas = const [],
-    this.formulaFilter,
+    this.rulesStatus = LoadStatus.idle,
+    this.rulesData,
+    this.rulesError,
+    this.definitionStatus = LoadStatus.idle,
+    this.definitionsData,
+    this.definitionError,
   });
 
   AnalysisState copyWith({
@@ -181,9 +165,12 @@ class AnalysisState {
     LoadStatus? summaryStatus,
     AudioSummaryModel? summaryData,
     String? summaryError,
-    LoadStatus? formulaStatus,
-    List<FormulaItem>? formulas,
-    Object? formulaFilter = _sentinel,
+    LoadStatus? rulesStatus,
+    RulesModel? rulesData,
+    String? rulesError,
+    LoadStatus? definitionStatus,
+    DefinitionsModel? definitionsData,
+    String? definitionError,
   }) =>
       AnalysisState(
         visualStatus: visualStatus ?? this.visualStatus,
@@ -192,16 +179,11 @@ class AnalysisState {
         summaryStatus: summaryStatus ?? this.summaryStatus,
         summaryData: summaryData ?? this.summaryData,
         summaryError: summaryError ?? this.summaryError,
-        formulaStatus: formulaStatus ?? this.formulaStatus,
-        formulas: formulas ?? this.formulas,
-        formulaFilter: formulaFilter == _sentinel ? this.formulaFilter : formulaFilter as String?,
+        rulesStatus: rulesStatus ?? this.rulesStatus,
+        rulesData: rulesData ?? this.rulesData,
+        rulesError: rulesError ?? this.rulesError,
+        definitionStatus: definitionStatus ?? this.definitionStatus,
+        definitionsData: definitionsData ?? this.definitionsData,
+        definitionError: definitionError ?? this.definitionError,
       );
-
-  List<FormulaItem> get filteredFormulas => formulaFilter == null
-      ? formulas
-      : formulas.where((f) => f.category == formulaFilter).toList();
-
-  List<String> get categories => formulas.map((f) => f.category).toSet().toList();
 }
-
-const _sentinel = Object();

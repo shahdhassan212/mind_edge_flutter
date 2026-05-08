@@ -1,16 +1,13 @@
 // ============================================================
 // Page 17 — Audio Explanation Player
-// • Dynamic: accepts AudioLesson via route arguments
-// • No common_widgets imports — all manual
-// • Manual colors (no AppColors / AppGradients tokens)
-// • Dio-ready repository stub (plug in endpoint when ready)
+// • Receives audioUrl + summary + displayName via route arguments
+//   (sent from ai_analysis_screen after /api/Document/process-audio)
 // • just_audio for real playback
 
 
 import 'dart:async';
-import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:just_audio/just_audio.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -45,65 +42,26 @@ class _C {
   static const scrubTrack = Color(0xFFE8D9C0);
   static const scrubFill1 = Color(0xFF2A1A0E);
   static const scrubFill2 = Color(0xFFC9943A);
-  static const highlight = Color(0x38C9943A);
 }
 
 // ─────────────────────────────────────────────────────────────
 // MODEL
 // ─────────────────────────────────────────────────────────────
 class AudioLesson {
-  final String id;
-  final String chapter;
-  final String title;
-  final String subtitle;
-  final String audioUrl;
-  final String transcript1;
-  final String transcript2;
-  final String highlightWord;
+  final String audioUrl;     // absolute URL to the MP3
+  final String summary;      // transcript — what the audio reads
+  final String displayName;  // file name shown as the card title
 
   const AudioLesson({
-    required this.id,
-    required this.chapter,
-    required this.title,
-    required this.subtitle,
     required this.audioUrl,
-    required this.transcript1,
-    required this.transcript2,
-    required this.highlightWord,
+    required this.summary,
+    required this.displayName,
   });
-
-  // Fallback when AI service hasn't responded yet
-  static AudioLesson placeholder() => const AudioLesson(
-        id: 'placeholder',
-        chapter: 'Chapter 9 · Organic Chemistry',
-        title: 'Nucleophilic\nSubstitution Reactions',
-        subtitle: 'Generated from your uploaded notes · 4 min 32 sec',
-        audioUrl: '',
-        transcript1: ', a nucleophile attacks an electrophilic carbon, displacing a leaving group.',
-        transcript2: 'The two primary mechanisms — SN1 and SN2 — differ in their…',
-        highlightWord: 'nucleophilic substitution',
-      );
 }
 
-// ─────────────────────────────────────────────────────────────
-// REPOSITORY  (plug in real endpoint when AI team delivers)
-// ─────────────────────────────────────────────────────────────
-class _AudioRepo {
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://midedge.runasp.net',
-    headers: {'accept': '*/*'},
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 30),
-  ));
-
-  // TODO: replace path + response mapping once AI endpoint is ready
-  Future<AudioLesson> fetchLesson(String lessonId) async {
-    // final resp = await _dio.get('/api/Audio/GetLesson?id=$lessonId');
-    // return AudioLesson.fromJson(resp.data);
-    await Future.delayed(const Duration(milliseconds: 400));
-    return AudioLesson.placeholder();
-  }
-}
+// Backend serves audio under this host; the API returns a relative path
+// like "/audio/<hash>.mp3", which we join with this base.
+const _kAudioBaseUrl = 'https://midedge.runasp.net';
 
 // ─────────────────────────────────────────────────────────────
 // SCREEN
@@ -120,7 +78,6 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
   bool _loading = true;
   String? _error;
 
-  final _repo = _AudioRepo();
   final _player = AudioPlayer();
 
   bool _captions = true;
@@ -129,7 +86,7 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
 
   // Playback driven by just_audio streams
   Duration _position = Duration.zero;
-  Duration _duration = const Duration(seconds: 272); // fallback 4:32
+  Duration _duration = Duration.zero;
   bool _playing = false;
 
   // Waveform animation controller for active bar
@@ -184,25 +141,49 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
 
   Future<void> _loadLesson() async {
     final args = ModalRoute.of(context)?.settings.arguments;
-    final lessonId = args is String ? args : 'placeholder';
-    try {
-      final lesson = await _repo.fetchLesson(lessonId);
-      if (!mounted) return;
-      setState(() {
-        _lesson = lesson;
-        _loading = false;
-      });
-      if (lesson.audioUrl.isNotEmpty) {
-        await _player.setUrl(lesson.audioUrl);
-        await _player.setSpeed(_speeds[_speedIdx]);
-        await _player.play();
-      }
-    } catch (e) {
-      if (mounted)
+    if (args is! Map) {
+      if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = 'No audio data was provided.';
           _loading = false;
         });
+      }
+      return;
+    }
+    final rawUrl = args['audioUrl']?.toString() ?? '';
+    final summary = args['summary']?.toString() ?? '';
+    final displayName = args['displayName']?.toString() ?? '';
+    if (rawUrl.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _error = 'Audio URL is missing.';
+          _loading = false;
+        });
+      }
+      return;
+    }
+
+    final audioUrl =
+        rawUrl.startsWith('http') ? rawUrl : '$_kAudioBaseUrl$rawUrl';
+
+    final lesson = AudioLesson(
+      audioUrl: audioUrl,
+      summary: summary,
+      displayName: displayName,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _lesson = lesson;
+      _loading = false;
+    });
+
+    try {
+      await _player.setUrl(audioUrl);
+      await _player.setSpeed(_speeds[_speedIdx]);
+      await _player.play();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
     }
   }
 
@@ -390,24 +371,29 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
               ),
             ),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(lesson.chapter.toUpperCase(),
+              Text('AUDIO EXPLANATION',
                   style: TextStyle(
                       fontFamily: 'DM Sans',
                       fontSize: 10,
-                      fontWeight: FontWeight.w700, // خليناه أتقل شوية للوضوح
-                      color: Colors.white.withOpacity(0.9), // أبيض صريح
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withOpacity(0.9),
                       letterSpacing: 1.4)),
               const SizedBox(height: 5),
-              Text(lesson.title,
+              Text(lesson.displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                       fontFamily: 'Syne',
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white, // النص الرئيسي أبيض
+                      color: Colors.white,
                       letterSpacing: -0.3,
                       height: 1.25)),
               const SizedBox(height: 4),
-              Text(lesson.subtitle,
+              Text(
+                  _duration > Duration.zero
+                      ? 'Generated from your uploaded notes · ${_fmt(_duration)}'
+                      : 'Generated from your uploaded notes',
                   style: TextStyle(
                       fontFamily: 'DM Sans',
                       fontSize: 12,
@@ -532,7 +518,7 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
             ],
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('LIVE TRANSCRIPT',
+            Text('TRANSCRIPT',
                 style: TextStyle(
                     fontFamily: 'DM Sans',
                     fontSize: 10,
@@ -540,42 +526,17 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
                     letterSpacing: 1.4,
                     color: _C.muted)),
             const SizedBox(height: 8),
-            Text.rich(TextSpan(
-              text: 'In ',
+            SelectableText(
+              lesson.summary.isNotEmpty
+                  ? lesson.summary
+                  : 'No transcript available.',
               style: const TextStyle(
                   fontFamily: 'DM Sans',
                   fontSize: 13,
-                  fontWeight: FontWeight.w300,
+                  fontWeight: FontWeight.w400,
                   color: _C.textBody,
                   height: 1.65),
-              children: [
-                WidgetSpan(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: _C.highlight,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(lesson.highlightWord,
-                        style: const TextStyle(
-                            fontFamily: 'DM Sans',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: _C.cocoaDeep)),
-                  ),
-                ),
-                TextSpan(text: lesson.transcript1),
-              ],
-            )),
-            const SizedBox(height: 4),
-            Text(lesson.transcript2,
-                style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w300,
-                    color: _C.textBody.withOpacity(0.6),
-                    height: 1.65)),
+            ),
           ]),
         ),
       );

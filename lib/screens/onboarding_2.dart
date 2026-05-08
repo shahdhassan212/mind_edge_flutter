@@ -1,5 +1,5 @@
 // ============================================================
-// Screen 03: Onboarding 2 — AI Audio Lectures — Fixed
+// Screen 03: Onboarding 2 — AI Audio Lectures 
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -68,7 +68,7 @@ class OnboardingScreen2 extends StatelessWidget {
                 child: LayoutBuilder(builder: (context, constraints) {
                   final cardW = (constraints.maxWidth - 56).clamp(180.0, 240.0);
                   final waveW = cardW - 44;
-                  final padLeft = (constraints.maxWidth - cardW) / 2;
+                  //final padLeft = (constraints.maxWidth - cardW) / 2;
 
                   return Center(
                     child: Padding(

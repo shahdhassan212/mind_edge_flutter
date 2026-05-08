@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/analysis/model/analysis_models.dart';
-import '../features/analysis/viewmodel/analysis_viewmodel.dart';
+import '../features/analysis/providers/analysis_providersl.dart';
 
 // ─────────────────────────────────────────────────────────────
 // COLOR TOKENS
@@ -26,12 +26,8 @@ class _C {
   static const heroDeco1 = Color(0x2EC9943A);
   static const heroDeco2 = Color(0x18C9943A);
   static const quizBtn = Color(0xFF2A1A0E);
-  static const planBtn = Color(0xFF2E2840);
   static const audioBtnA = Color(0xFFC9943A);
   static const audioBtnB = Color(0xFFE8B84B);
-  static const bubbleUser = Color(0xFF2A1A0E);
-  static const bubbleAI = Color(0xFFFEFCF7);
-  static const inputBg = Color(0xFFF4EDE0);
   static const formulaCardBg = Color(0xFFFAF6EE);
   static const formulaTagBg = Color(0xFF2A1A0E);
   static const formulaTagText = Color(0xFFE8B84B);
@@ -42,66 +38,80 @@ class _C {
 }
 
 // ─────────────────────────────────────────────────────────────
+// LATEX PARSER HELPER
+// Splits a string into alternating plain-text / LaTeX segments.
+// Handles both \( ... \) and \[ ... \] delimiters.
+// ─────────────────────────────────────────────────────────────
+sealed class _Segment {}
+
+class _TextSegment extends _Segment {
+  final String text;
+  _TextSegment(this.text);
+}
+
+class _LatexSegment extends _Segment {
+  final String latex;
+  final bool isDisplay; // true for \[ \]
+  _LatexSegment(this.latex, {this.isDisplay = false});
+}
+
+List<_Segment> _parseSegments(String raw) {
+  // Normalise escaped delimiters that come from JSON double-encoding
+  final s = raw
+      .replaceAll(r'\\(', r'\(')
+      .replaceAll(r'\\)', r'\)')
+      .replaceAll(r'\\[', r'\[')
+      .replaceAll(r'\\]', r'\]');
+
+  final segments = <_Segment>[];
+  // Match \( ... \) for inline and \[ ... \] for display
+  final re = RegExp(r'\\\((.+?)\\\)|\\\[(.+?)\\\]', dotAll: true);
+  int cursor = 0;
+
+  for (final m in re.allMatches(s)) {
+    if (m.start > cursor) {
+      segments.add(_TextSegment(s.substring(cursor, m.start)));
+    }
+    final isDisplay = m.group(2) != null;
+    final latex = (m.group(1) ?? m.group(2))!.trim();
+    segments.add(_LatexSegment(latex, isDisplay: isDisplay));
+    cursor = m.end;
+  }
+
+  if (cursor < s.length) {
+    segments.add(_TextSegment(s.substring(cursor)));
+  }
+
+  return segments;
+}
+
+// ─────────────────────────────────────────────────────────────
 // SCREEN
 // ─────────────────────────────────────────────────────────────
 class AIAnalysisScreen extends ConsumerStatefulWidget {
-  /// The file sent to analyze-visuals (needed for multipart upload).
-  /// Optional — when null, the screen shows an empty state with an
-  /// upload button so the user can pick a file from inside the screen.
   final File? file;
-
-  /// Display name shown in the hero card
   final String? displayName;
 
-  const AIAnalysisScreen({
-    super.key,
-    this.file,
-    this.displayName,
-  });
+  const AIAnalysisScreen({super.key, this.file, this.displayName});
 
   @override
   ConsumerState<AIAnalysisScreen> createState() => _AIAnalysisScreenState();
 }
 
 class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
-  // Mutable so we can swap files via in-screen upload.
-  File? _file;
-  String? _displayName;
   String? _fileName;
-
-  // UI state
-  int _tab = 0; // 0=Summary 1=Formulas 2=Key Terms
-  bool _chatOpen = false;
-  bool _aiTyping = false;
-
-  final List<_Msg> _msgs = [];
-  final TextEditingController _ctrl = TextEditingController();
-  final ScrollController _scroll = ScrollController();
-
-  int _replyIdx = 0;
+  int _tab = 0; // 0=Summary 1=Rules 2=Analysis 3=Definitions
 
   @override
   void initState() {
     super.initState();
     if (widget.file != null) {
-      _setFile(widget.file!, widget.displayName ?? widget.file!.path.split(RegExp(r'[\\/]+')).last);
+      _fileName = widget.file!.path.split(RegExp(r'[\\\\/]+')).last;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(analysisViewModelProvider(_fileName!).notifier).loadAll(widget.file!);
+      });
     }
-  }
-
-  void _setFile(File file, String displayName) {
-    _file = file;
-    _displayName = displayName;
-    _fileName = file.path.split(RegExp(r'[\\/]+')).last;
-
-    // Kick off all endpoints once a file is loaded.
-    // analyze-visuals → process-audio is sequential (summary needs document_name),
-    // formulas runs independently in parallel.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _fileName == null) return;
-      final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
-      vm.loadVisualAnalysisThenSummary(file);
-      vm.loadFormulas();
-    });
   }
 
   Future<void> _pickFile() async {
@@ -113,27 +123,16 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
     if (result == null || result.files.isEmpty) return;
     final picked = result.files.first;
     if (picked.path == null || !mounted) return;
+    final file = File(picked.path!);
     setState(() {
+      _fileName = picked.name;
       _tab = 0;
-      _msgs.clear();
-      _setFile(File(picked.path!), picked.name);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(analysisViewModelProvider(_fileName!).notifier).loadAll(file);
     });
   }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    _scroll.dispose();
-    super.dispose();
-  }
-
-
-  void _scrollDown() => Future.delayed(const Duration(milliseconds: 80), () {
-        if (_scroll.hasClients) {
-          _scroll.animateTo(_scroll.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
-        }
-      });
 
   // ─────────────────────────────────────────────────────────
   // BUILD
@@ -152,22 +151,79 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
         ),
         child: SafeArea(
           child: Column(children: [
-            _TopBar(
-              onBack: () {
-                if (_chatOpen)
-                  setState(() => _chatOpen = false);
-                else
-                  Navigator.pop(context);
-              },
-              onUpload: _pickFile,
-            ),
+            _TopBar(onBack: () => Navigator.pop(context)),
             Expanded(
-              child: _file == null
-                  ? _EmptyUpload(onPick: _pickFile)
-                  : (_chatOpen ? _buildChat() : _buildAnalysis()),
+              child: _fileName == null ? _buildEmpty() : _buildAnalysis(),
             ),
             _buildBottomBar(context),
           ]),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // EMPTY STATE
+  // ─────────────────────────────────────────────────────────
+  Widget _buildEmpty() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: _C.chipBg,
+                shape: BoxShape.circle,
+                border: Border.all(color: _C.borderDash, width: 1.5),
+              ),
+              child: const Icon(Icons.upload_file_rounded, size: 36, color: _C.goldDark),
+            ),
+            const SizedBox(height: 18),
+            const Text('Upload a document to analyze',
+                style: TextStyle(
+                    fontFamily: 'Syne',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: _C.textDark)),
+            const SizedBox(height: 6),
+            const Text('PDF, DOC, DOCX, PNG, or JPG',
+                style: TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 12,
+                    color: _C.textMuted,
+                    fontWeight: FontWeight.w400)),
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: _pickFile,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _C.quizBtn,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                        color: _C.quizBtn.withValues(alpha: 0.30),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4))
+                  ],
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                  SizedBox(width: 6),
+                  Text('Pick a file',
+                      style: TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                ]),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -185,7 +241,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: _HeroCard(
-            displayName: _displayName!,
+            displayName: widget.displayName ?? _fileName ?? '',
             visualStatus: state.visualStatus,
             summaryStatus: state.summaryStatus,
           ),
@@ -199,8 +255,8 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
             ),
             const SizedBox(width: 8),
             _StatTile(
-              value: state.formulas.length.toString(),
-              label: 'Formulas',
+              value: state.rulesData?.ruleLines.length.toString() ?? '–',
+              label: 'Rules',
             ),
             const SizedBox(width: 8),
             _StatTile(
@@ -213,11 +269,12 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: _TabBar(
             active: _tab,
-            labels: const ['Summary', 'Formulas', 'Analysis'],
+            labels: const ['Summary', 'Rules', 'Analysis', 'Definitions'],
             icons: const [
               Icons.notes_rounded,
-              Icons.functions_rounded,
+              Icons.rule_rounded,
               Icons.bar_chart_rounded,
+              Icons.menu_book_rounded,
             ],
             onTap: (i) => setState(() => _tab = i),
           ),
@@ -237,12 +294,8 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
           child: _AskAIStrip(onTap: () {
-            setState(() {
-              _chatOpen = true;
-              if (_msgs.isEmpty) {
-                _msgs.add(
-                    const _Msg(text: 'مرحباً! اسألني أي سؤال عن محتوى الملف 🧪', isUser: false));
-              }
+            Navigator.pushNamed(context, '/ai-chat', arguments: {
+              'fileName': widget.displayName ?? _fileName ?? '',
             });
           }),
         ),
@@ -251,27 +304,28 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // TAB CONTENT ROUTER
+  // TAB ROUTER
   // ─────────────────────────────────────────────────────────
   Widget _buildTabContent(AnalysisState state) {
     switch (_tab) {
       case 0:
         return _buildSummaryTab(state);
       case 1:
-        return _buildFormulaSheet(state);
+        return _buildRulesTab(state);
       case 2:
         return _buildAnalysisTab(state);
+      case 3:
+        return _buildDefinitionsTab(state);
       default:
         return const SizedBox.shrink();
     }
   }
 
   // ─────────────────────────────────────────────────────────
-  // TAB 0 — SUMMARY (process-audio)
+  // TAB 0 — SUMMARY
   // ─────────────────────────────────────────────────────────
   Widget _buildSummaryTab(AnalysisState state) {
     final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
-
     return _ContentShell(
       label: 'AI Summary',
       child: switch (state.summaryStatus) {
@@ -286,36 +340,17 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
   }
 
   // ─────────────────────────────────────────────────────────
-  // TAB 2 — VISUAL ANALYSIS (analyze-visuals)
+  // TAB 1 — RULES
   // ─────────────────────────────────────────────────────────
-  Widget _buildAnalysisTab(AnalysisState state) {
-    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
-
-    return _ContentShell(
-      label: 'Visual Analysis',
-      child: switch (state.visualStatus) {
-        LoadStatus.idle || LoadStatus.loading => const _TextSkeleton(lines: 5),
-        LoadStatus.failure => _ErrorRetry(
-            message: state.visualError ?? 'Failed to analyze visuals',
-            onRetry: () => vm.retryAll(_file!),
-          ),
-        LoadStatus.success => _VisualAnalysisBody(data: state.visualData!),
-      },
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TAB 1 — FORMULA SHEET
-  // ─────────────────────────────────────────────────────────
-  Widget _buildFormulaSheet(AnalysisState state) {
+  Widget _buildRulesTab(AnalysisState state) {
     final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        const _SectionLabel('Formula Sheet'),
+        const _SectionLabel('Rules & Formulas'),
         const Spacer(),
         GestureDetector(
-          onTap: vm.loadFormulas,
+          onTap: vm.retryRules,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -337,76 +372,110 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
         ),
       ]),
       const SizedBox(height: 10),
-
-      // Category filter pills
-      if (state.categories.isNotEmpty && state.formulaStatus == LoadStatus.success) ...[
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(children: [
-            _FilterPill(
-              label: 'All',
-              active: state.formulaFilter == null,
-              onTap: () => vm.setFormulaFilter(null),
-            ),
-            const SizedBox(width: 6),
-            ...state.categories.map((cat) => Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: _FilterPill(
-                    label: cat,
-                    active: state.formulaFilter == cat,
-                    onTap: () => vm.setFormulaFilter(state.formulaFilter == cat ? null : cat),
-                  ),
-                )),
-          ]),
-        ),
-        const SizedBox(height: 12),
-      ],
-
-      if (state.formulaStatus == LoadStatus.loading)
-        Column(children: List.generate(3, (_) => const _FormulaSkeleton()))
-      else if (state.filteredFormulas.isEmpty)
-        _EmptyFormulas()
-      else
-        Column(
-          children: state.filteredFormulas
-              .map((f) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _FormulaCard(
-                      item: f,
-                      onAskAI: () {
-                        setState(() {
-                          _chatOpen = true;
-                          _msgs.add(_Msg(
-                              text: 'Explain the formula: ${f.label} — ${f.expression}',
-                              isUser: true));
-                          _aiTyping = true;
-                        });
-                        Future.delayed(const Duration(milliseconds: 1200), () {
-                          if (!mounted) return;
-                          setState(() {
-                            _aiTyping = false;
-                            _msgs.add(_Msg(
-                                text: '${f.label}: ${f.description} — ${f.variables.join(", ")}.',
-                                isUser: false));
-                          });
-                          _scrollDown();
-                        });
-                      },
-                    ),
-                  ))
-              .toList(),
-        ),
+      switch (state.rulesStatus) {
+        LoadStatus.idle ||
+        LoadStatus.loading =>
+          Column(children: List.generate(3, (_) => const _RuleSkeleton())),
+        LoadStatus.failure => _ErrorRetry(
+            message: state.rulesError ?? 'Failed to load rules',
+            onRetry: vm.retryRules,
+          ),
+        LoadStatus.success => state.rulesData!.ruleLines.isEmpty
+            ? _EmptyState(
+                icon: Icons.rule_rounded,
+                message: 'No rules found in this document',
+              )
+            : Column(
+                children: state.rulesData!.ruleLines
+                    .asMap()
+                    .entries
+                    .map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _RuleCard(index: e.key + 1, content: e.value),
+                        ))
+                    .toList(),
+              ),
+      },
     ]);
   }
 
   // ─────────────────────────────────────────────────────────
-  // TOPICS CHIPS — dynamic from correctedText keywords
+  // TAB 2 — VISUAL ANALYSIS
+  // ─────────────────────────────────────────────────────────
+  Widget _buildAnalysisTab(AnalysisState state) {
+    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+    return _ContentShell(
+      label: 'Visual Analysis',
+      child: switch (state.visualStatus) {
+        LoadStatus.idle || LoadStatus.loading => const _TextSkeleton(lines: 5),
+        LoadStatus.failure => _ErrorRetry(
+            message: state.visualError ?? 'Failed to analyze visuals',
+            onRetry: () => vm.retryAll(widget.file!),
+          ),
+        LoadStatus.success => _VisualAnalysisBody(data: state.visualData!),
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // TAB 3 — DEFINITIONS
+  // ─────────────────────────────────────────────────────────
+  Widget _buildDefinitionsTab(AnalysisState state) {
+    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        const _SectionLabel('Definitions'),
+        const Spacer(),
+        GestureDetector(
+          onTap: vm.retryDefinitions,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _C.chipBg,
+              border: Border.all(color: _C.chipBdr),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.refresh_rounded, size: 11, color: _C.textMuted),
+              const SizedBox(width: 4),
+              const Text('Refresh',
+                  style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 10,
+                      color: _C.textMuted,
+                      fontWeight: FontWeight.w500)),
+            ]),
+          ),
+        ),
+      ]),
+      const SizedBox(height: 10),
+      switch (state.definitionStatus) {
+        LoadStatus.idle || LoadStatus.loading => const _TextSkeleton(lines: 6),
+        LoadStatus.failure => _ErrorRetry(
+            message: state.definitionError ?? 'Failed to load definitions',
+            onRetry: vm.retryDefinitions,
+          ),
+        LoadStatus.success => state.definitionsData!.markdownContent.trim().isEmpty
+            ? _EmptyState(
+                icon: Icons.menu_book_rounded,
+                message: 'No definitions found in this document',
+              )
+            : _ContentShell(
+                label: '',
+                child: _MarkdownText(text: state.definitionsData!.markdownContent),
+              ),
+      },
+    ]);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // TOPICS CHIPS
   // ─────────────────────────────────────────────────────────
   Widget _buildTopicsChips(AnalysisState state) {
     final topics = state.visualStatus == LoadStatus.success
         ? _extractTopics(state.visualData!.correctedText)
-        : <String>['', '','',''];
-
+        : <String>['SN1 Mechanism', 'SN2 Mechanism', 'Carbocations', 'Stereochemistry'];
     return Wrap(
       spacing: 7,
       runSpacing: 7,
@@ -414,105 +483,22 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
     );
   }
 
-  /// Simple keyword extractor — pulls bold markdown headings as topic chips
   List<String> _extractTopics(String text) {
     final headings = RegExp(r'#{1,3} (.+)').allMatches(text);
     final topics = headings.map((m) => m.group(1)!.trim()).take(6).toList();
     return topics.isEmpty
-        ? ['', '', '', '']
+        ? ['Energy Bands', 'Insulators', 'Forbidden Gap', 'Dielectric Strength']
         : topics;
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // CHAT VIEW
-  // ─────────────────────────────────────────────────────────
-  Widget _buildChat() {
-    return Column(children: [
-      Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        decoration: BoxDecoration(
-          color: _C.cardBg,
-          border: Border(bottom: BorderSide(color: _C.border)),
-        ),
-        child: Row(children: [
-          GestureDetector(
-            onTap: () => setState(() => _chatOpen = false),
-            child: const Row(children: [
-              Icon(Icons.arrow_back_ios_new_rounded, size: 13, color: _C.textMuted),
-              SizedBox(width: 4),
-              Text('Back',
-                  style: TextStyle(
-                      fontFamily: 'DM Sans',
-                      fontSize: 12,
-                      color: _C.textMuted,
-                      fontWeight: FontWeight.w500)),
-            ]),
-          ),
-          const SizedBox(width: 12),
-          const Text('Ask AI',
-              style: TextStyle(
-                  fontFamily: 'Syne',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: _C.textDark)),
-        ]),
-      ),
-      Expanded(
-        child: ListView.builder(
-          controller: _scroll,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-          itemCount: _msgs.length + (_aiTyping ? 1 : 0),
-          itemBuilder: (ctx, i) {
-            if (_aiTyping && i == _msgs.length) return const _TypingBubble();
-            return _ChatBubble(msg: _msgs[i]);
-          },
-        ),
-      ),
-      Container(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-        decoration: BoxDecoration(
-          color: _C.cardBg,
-          border: Border(top: BorderSide(color: _C.border)),
-        ),
-        child: Row(children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _C.inputBg,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: _C.border),
-              ),
-              child: TextField(
-                controller: _ctrl,
-                style: const TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: _C.textDark),
-                decoration: const InputDecoration.collapsed(
-                  hintText: 'Ask about this document...',
-                  hintStyle: TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: _C.textHint),
-                ),
-               // onSubmitted: (_) => _send(),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-          //  onTap: _send,
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(color: _C.bubbleUser, shape: BoxShape.circle),
-              child: const Icon(Icons.send_rounded, size: 16, color: Colors.white),
-            ),
-          ),
-        ]),
-      ),
-    ]);
   }
 
   // ─────────────────────────────────────────────────────────
   // BOTTOM BAR
   // ─────────────────────────────────────────────────────────
   Widget _buildBottomBar(BuildContext context) {
+    final summaryData =
+        _fileName != null ? ref.watch(analysisViewModelProvider(_fileName!)).summaryData : null;
+    final audioReady = (summaryData?.audioUrl ?? '').isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
       decoration: BoxDecoration(
@@ -552,60 +538,249 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Expanded(
-          flex: 2,
-          child: GestureDetector(
-            onTap: () => Navigator.pushNamed(context, '/study_plan_screen'),
+        GestureDetector(
+          onTap: () {
+            if (!audioReady) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Audio is still being generated…')),
+              );
+              return;
+            }
+            Navigator.pushNamed(
+              context,
+              '/audio_screen',
+              arguments: {
+                'audioUrl': summaryData!.audioUrl,
+                'summary': summaryData.summary,
+                'displayName': widget.displayName ?? _fileName ?? summaryData.filename,
+              },
+            );
+          },
+          child: Opacity(
+            opacity: audioReady ? 1 : 0.5,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 13),
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
-                color: _C.planBtn,
+                gradient: const LinearGradient(
+                    colors: [_C.audioBtnA, _C.audioBtnB],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight),
                 borderRadius: BorderRadius.circular(13),
                 boxShadow: [
                   BoxShadow(
-                      color: _C.planBtn.withOpacity(0.40),
-                      blurRadius: 18,
-                      offset: const Offset(0, 6))
+                      color: _C.goldDark.withOpacity(0.40),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4))
                 ],
               ),
-              child: const Column(mainAxisSize: MainAxisSize.min, children: [
-                Text('Add to Study Plan',
-                    style: TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white)),
-                Text('✦', style: TextStyle(fontSize: 9, color: Color(0x88FFFFFF))),
-              ]),
+              child: const Center(
+                  child: Icon(Icons.headphones_rounded, size: 20, color: Colors.white)),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        GestureDetector(
-          onTap: () => Navigator.pushNamed(context, '/audio_screen'),
-          child: Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [_C.audioBtnA, _C.audioBtnB],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
-              borderRadius: BorderRadius.circular(13),
-              boxShadow: [
-                BoxShadow(
-                    color: _C.goldDark.withOpacity(0.40),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4))
-              ],
-            ),
-            child:
-                const Center(child: Icon(Icons.headphones_rounded, size: 20, color: Colors.white)),
           ),
         ),
       ]),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// RULE CARD — parses plain text + LaTeX segments
+// ─────────────────────────────────────────────────────────────
+class _RuleCard extends StatelessWidget {
+  final int index;
+  final String content;
+  const _RuleCard({required this.index, required this.content});
+
+  @override
+  Widget build(BuildContext context) {
+    final segments = _parseSegments(content);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: _C.formulaCardBg,
+        border: Border.all(color: _C.border, width: 1.2),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: _C.textDark.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))
+        ],
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Index badge
+        Container(
+          width: 24,
+          height: 24,
+          margin: const EdgeInsets.only(top: 2),
+          decoration: const BoxDecoration(color: _C.formulaTagBg, shape: BoxShape.circle),
+          child: Center(
+            child: Text('$index',
+                style: const TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: _C.formulaTagText)),
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // Content — mixed text + LaTeX
+        Expanded(
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 2,
+            runSpacing: 6,
+            children: segments.map((seg) {
+              if (seg is _TextSegment) {
+                final trimmed = seg.text.trim();
+                if (trimmed.isEmpty) return const SizedBox.shrink();
+                return Text(
+                  trimmed,
+                  style: const TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 12.5,
+                      color: _C.textBody,
+                      height: 1.6,
+                      fontWeight: FontWeight.w400),
+                );
+              }
+
+              final latex = seg as _LatexSegment;
+
+              // Display math — full-width centered block
+              if (latex.isDisplay) {
+                return SizedBox(
+                  width: double.infinity,
+                  child: Center(
+                    child: Math.tex(
+                      latex.latex,
+                      mathStyle: MathStyle.display,
+                      textStyle: const TextStyle(fontSize: 15, color: _C.textDark),
+                      onErrorFallback: (e) => Text(
+                        latex.latex,
+                        style: const TextStyle(
+                            fontFamily: 'DM Mono', fontSize: 12, color: _C.textMuted),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              // Inline math — dark pill background
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _C.formulaTagBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Math.tex(
+                  latex.latex,
+                  mathStyle: MathStyle.text,
+                  textStyle: const TextStyle(fontSize: 13, color: _C.goldLight),
+                  onErrorFallback: (e) => Text(
+                    latex.latex,
+                    style:
+                        const TextStyle(fontFamily: 'DM Mono', fontSize: 11, color: _C.goldLight),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// RULE SKELETON
+// ─────────────────────────────────────────────────────────────
+class _RuleSkeleton extends StatefulWidget {
+  const _RuleSkeleton();
+  @override
+  State<_RuleSkeleton> createState() => _RuleSkeletonState();
+}
+
+class _RuleSkeletonState extends State<_RuleSkeleton> with SingleTickerProviderStateMixin {
+  late AnimationController _c;
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Opacity(
+          opacity: 0.4 + _c.value * 0.4,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: _C.formulaCardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _C.border),
+            ),
+            child: Row(children: [
+              Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(color: _C.skeletonBg, shape: BoxShape.circle)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(
+                      width: double.infinity,
+                      height: 11,
+                      decoration: BoxDecoration(
+                          color: _C.skeletonBg, borderRadius: BorderRadius.circular(4))),
+                  const SizedBox(height: 6),
+                  Container(
+                      width: MediaQuery.of(context).size.width * 0.55,
+                      height: 11,
+                      decoration: BoxDecoration(
+                          color: _C.skeletonBg.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(4))),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+// EMPTY STATE
+// ─────────────────────────────────────────────────────────────
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  const _EmptyState({required this.icon, required this.message});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(children: [
+          Icon(icon, size: 28, color: _C.textMuted.withOpacity(0.5)),
+          const SizedBox(height: 10),
+          Text(message,
+              style: const TextStyle(
+                  fontFamily: 'DM Sans',
+                  fontSize: 13,
+                  color: _C.textMuted,
+                  fontWeight: FontWeight.w400)),
+        ]),
+      );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -618,7 +793,6 @@ class _VisualAnalysisBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Raw extracted text
       if (data.rawText.isNotEmpty) ...[
         const _SectionLabel('Extracted Text'),
         const SizedBox(height: 8),
@@ -630,16 +804,12 @@ class _VisualAnalysisBody extends StatelessWidget {
             border: Border.all(color: _C.border),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            data.rawText,
-            style: const TextStyle(
-                fontFamily: 'DM Mono', fontSize: 11, color: _C.textBody, height: 1.6),
-          ),
+          child: Text(data.rawText,
+              style: const TextStyle(
+                  fontFamily: 'DM Mono', fontSize: 11, color: _C.textBody, height: 1.6)),
         ),
         const SizedBox(height: 16),
       ],
-
-      // Graph analyses
       if (data.graphs.isNotEmpty) ...[
         _SectionLabel('Graphs Analysed (${data.graphs.length})'),
         const SizedBox(height: 8),
@@ -649,8 +819,6 @@ class _VisualAnalysisBody extends StatelessWidget {
             )),
         const SizedBox(height: 8),
       ],
-
-      // Corrected / full markdown
       const _SectionLabel('Full Analysis'),
       const SizedBox(height: 8),
       _MarkdownText(text: data.correctedText),
@@ -693,10 +861,8 @@ class _GraphCardState extends State<_GraphCard> {
             child: Row(children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _C.formulaTagBg,
-                  borderRadius: BorderRadius.circular(6),
-                ),
+                decoration:
+                    BoxDecoration(color: _C.formulaTagBg, borderRadius: BorderRadius.circular(6)),
                 child: Text('Graph ${widget.index}',
                     style: const TextStyle(
                         fontFamily: 'DM Sans',
@@ -707,14 +873,12 @@ class _GraphCardState extends State<_GraphCard> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  widget.graph.image,
-                  style: const TextStyle(
-                      fontFamily: 'DM Sans',
-                      fontSize: 10,
-                      color: _C.textMuted,
-                      overflow: TextOverflow.ellipsis),
-                ),
+                child: Text(widget.graph.image,
+                    style: const TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 10,
+                        color: _C.textMuted,
+                        overflow: TextOverflow.ellipsis)),
               ),
               AnimatedRotation(
                 duration: const Duration(milliseconds: 200),
@@ -729,29 +893,25 @@ class _GraphCardState extends State<_GraphCard> {
             child: _expanded
                 ? Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Text(
-                      widget.graph.analysis,
-                      style: const TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 12,
-                          color: _C.textBody,
-                          height: 1.6,
-                          fontWeight: FontWeight.w300),
-                    ),
+                    child: Text(widget.graph.analysis,
+                        style: const TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 12,
+                            color: _C.textBody,
+                            height: 1.6,
+                            fontWeight: FontWeight.w300)),
                   )
                 : Padding(
                     padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                    child: Text(
-                      widget.graph.analysis,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 12,
-                          color: _C.textMuted,
-                          height: 1.5,
-                          fontWeight: FontWeight.w300),
-                    ),
+                    child: Text(widget.graph.analysis,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 12,
+                            color: _C.textMuted,
+                            height: 1.5,
+                            fontWeight: FontWeight.w300)),
                   ),
           ),
         ]),
@@ -761,7 +921,7 @@ class _GraphCardState extends State<_GraphCard> {
 }
 
 // ─────────────────────────────────────────────────────────────
-// MARKDOWN TEXT — renders ## headings + **bold** simply
+// MARKDOWN TEXT
 // ─────────────────────────────────────────────────────────────
 class _MarkdownText extends StatelessWidget {
   final String text;
@@ -807,7 +967,6 @@ class _MarkdownText extends StatelessWidget {
           );
         }
         if (line.trim().isEmpty) return const SizedBox(height: 4);
-        // Strip leading "- " or "N. "
         final body = line.replaceFirst(RegExp(r'^[-•]\s+'), '');
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 1.5),
@@ -846,8 +1005,10 @@ class _ContentShell extends StatelessWidget {
           ],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _SectionLabel(label),
-          const SizedBox(height: 10),
+          if (label.isNotEmpty) ...[
+            _SectionLabel(label),
+            const SizedBox(height: 10),
+          ],
           child,
         ]),
       );
@@ -892,10 +1053,7 @@ class _ErrorRetry extends StatelessWidget {
             onTap: onRetry,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: _C.textDark,
-                borderRadius: BorderRadius.circular(8),
-              ),
+              decoration: BoxDecoration(color: _C.textDark, borderRadius: BorderRadius.circular(8)),
               child: const Text('Retry',
                   style: TextStyle(
                       fontFamily: 'DM Sans',
@@ -909,7 +1067,7 @@ class _ErrorRetry extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// TEXT SKELETON (summary / analysis loading)
+// TEXT SKELETON
 // ─────────────────────────────────────────────────────────────
 class _TextSkeleton extends StatefulWidget {
   final int lines;
@@ -956,36 +1114,76 @@ class _TextSkeletonState extends State<_TextSkeleton> with SingleTickerProviderS
 }
 
 // ─────────────────────────────────────────────────────────────
-// EMPTY FORMULAS
+// SHARED WIDGETS
 // ─────────────────────────────────────────────────────────────
-class _EmptyFormulas extends StatelessWidget {
+class _TopBar extends StatelessWidget {
+  final VoidCallback onBack;
+  const _TopBar({required this.onBack});
   @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Column(children: [
-          Icon(Icons.functions_rounded, size: 28, color: _C.textMuted.withOpacity(0.5)),
-          const SizedBox(height: 10),
-          const Text('No formulas found',
-              style: TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 13,
-                  color: _C.textMuted,
-                  fontWeight: FontWeight.w400)),
-          const SizedBox(height: 4),
-          Text('Waiting for AI extraction…',
-              style: TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 11,
-                  color: _C.textMuted.withOpacity(0.6),
-                  fontWeight: FontWeight.w300)),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: Row(children: [
+          _IcoBtn(icon: Icons.arrow_back_ios_new_rounded, onTap: onBack),
+          const Expanded(
+            child: Center(
+              child: Text('AI Analysis',
+                  style: TextStyle(
+                      fontFamily: 'Syne',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: _C.textDark)),
+            ),
+          ),
+          _IcoBtn(icon: Icons.upload_rounded, onTap: () {}),
         ]),
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-// HERO CARD — shows live status badges
-// ─────────────────────────────────────────────────────────────
+class _IcoBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _IcoBtn({required this.icon, required this.onTap});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: _C.cardBg.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: _C.border),
+            boxShadow: [
+              BoxShadow(
+                  color: _C.textDark.withOpacity(0.06), blurRadius: 6, offset: const Offset(0, 2))
+            ],
+          ),
+          child: Icon(icon, size: 14, color: _C.textDark),
+        ),
+      );
+}
+
+class _HeroBadge extends StatelessWidget {
+  final String label;
+  final bool filled;
+  const _HeroBadge({required this.label, required this.filled});
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(filled ? 0.14 : 0.08),
+          border: Border.all(color: Colors.white.withOpacity(0.22)),
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontFamily: 'DM Sans',
+                fontSize: 10.5,
+                fontWeight: filled ? FontWeight.w700 : FontWeight.w400,
+                color: filled ? _C.goldLight : Colors.white70)),
+      );
+}
+
 class _HeroCard extends StatelessWidget {
   final String displayName;
   final LoadStatus visualStatus;
@@ -1044,16 +1242,14 @@ class _HeroCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 7),
                 Expanded(
-                  child: Text(
-                    displayName,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 9.5,
-                        color: _C.textMuted,
-                        letterSpacing: 0.4,
-                        fontWeight: FontWeight.w600),
-                  ),
+                  child: Text(displayName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 9.5,
+                          color: _C.textMuted,
+                          letterSpacing: 0.4,
+                          fontWeight: FontWeight.w600)),
                 ),
               ]),
               const SizedBox(height: 10),
@@ -1091,9 +1287,6 @@ class _HeroCard extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-// TAB BAR WITH ICONS
-// ─────────────────────────────────────────────────────────────
 class _TabBar extends StatelessWidget {
   final int active;
   final List<String> labels;
@@ -1141,457 +1334,6 @@ class _TabBar extends StatelessWidget {
             ),
           ),
         ),
-      );
-}
-
-// ─────────────────────────────────────────────────────────────
-// FORMULA CARD (unchanged logic, kept inline)
-// ─────────────────────────────────────────────────────────────
-class _FormulaCard extends StatefulWidget {
-  final FormulaItem item;
-  final VoidCallback onAskAI;
-  const _FormulaCard({required this.item, required this.onAskAI});
-  @override
-  State<_FormulaCard> createState() => _FormulaCardState();
-}
-
-class _FormulaCardState extends State<_FormulaCard> {
-  bool _expanded = false;
-  bool _copied = false;
-
-  void _copy() {
-    Clipboard.setData(ClipboardData(text: widget.item.expression));
-    setState(() => _copied = true);
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _copied = false);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final f = widget.item;
-    return GestureDetector(
-      onTap: () => setState(() => _expanded = !_expanded),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeInOut,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: _C.formulaCardBg,
-          border: Border.all(color: _C.border, width: 1.2),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: _C.textDark.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))
-          ],
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 13, 14, 0),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration:
-                    BoxDecoration(color: _C.formulaTagBg, borderRadius: BorderRadius.circular(6)),
-                child: Text(f.category,
-                    style: const TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: _C.formulaTagText,
-                        letterSpacing: 0.4)),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(f.label,
-                    style: const TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: _C.textDark)),
-              ),
-              AnimatedRotation(
-                duration: const Duration(milliseconds: 200),
-                turns: _expanded ? 0.5 : 0,
-                child: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: _C.textMuted),
-              ),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration:
-                  BoxDecoration(color: _C.textDark, borderRadius: BorderRadius.circular(12)),
-              child: Row(children: [
-                Expanded(
-                  child: Text(f.expression,
-                      style: const TextStyle(
-                          fontFamily: 'DM Mono',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: _C.goldLight,
-                          letterSpacing: 0.5,
-                          height: 1.3)),
-                ),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: _copy,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                    decoration: BoxDecoration(
-                      color:
-                          _copied ? _C.goldDark.withOpacity(0.3) : Colors.white.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(7),
-                      border: Border.all(
-                          color: _copied
-                              ? _C.goldDark.withOpacity(0.5)
-                              : Colors.white.withOpacity(0.12)),
-                    ),
-                    child: Text(
-                      _copied ? 'Copied!' : 'Copy',
-                      style: TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: _copied ? _C.goldLight : Colors.white54),
-                    ),
-                  ),
-                ),
-              ]),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-            child: Text(f.description,
-                style: const TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 11.5,
-                    color: _C.textMuted,
-                    fontWeight: FontWeight.w300,
-                    height: 1.5)),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeInOut,
-            child: _expanded
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const _SectionLabel('Variables'),
-                      const SizedBox(height: 6),
-                      ...f.variables.map((v) => Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Container(
-                                  margin: const EdgeInsets.only(top: 6),
-                                  width: 4,
-                                  height: 4,
-                                  decoration: const BoxDecoration(
-                                      color: _C.goldDark, shape: BoxShape.circle)),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(v,
-                                    style: const TextStyle(
-                                        fontFamily: 'DM Sans',
-                                        fontSize: 11.5,
-                                        color: _C.textBody,
-                                        fontWeight: FontWeight.w300,
-                                        height: 1.5)),
-                              ),
-                            ]),
-                          )),
-                    ]),
-                  )
-                : const SizedBox.shrink(),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 13),
-            child: Row(children: [
-              GestureDetector(
-                onTap: widget.onAskAI,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _C.goldDark.withOpacity(0.10),
-                    border: Border.all(color: _C.goldDark.withOpacity(0.25)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.auto_awesome_rounded, size: 11, color: _C.goldDark),
-                    const SizedBox(width: 5),
-                    const Text('Ask AI',
-                        style: TextStyle(
-                            fontFamily: 'DM Sans',
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: _C.goldDark)),
-                  ]),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                _expanded ? 'Hide details' : 'Show variables',
-                style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 10,
-                    color: _C.textMuted.withOpacity(0.7),
-                    fontWeight: FontWeight.w400),
-              ),
-            ]),
-          ),
-        ]),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// FORMULA SKELETON
-// ─────────────────────────────────────────────────────────────
-class _FormulaSkeleton extends StatefulWidget {
-  const _FormulaSkeleton();
-  @override
-  State<_FormulaSkeleton> createState() => _FormulaSkeletonState();
-}
-
-class _FormulaSkeletonState extends State<_FormulaSkeleton> with SingleTickerProviderStateMixin {
-  late AnimationController _c;
-  @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _c,
-        builder: (_, __) => Opacity(
-          opacity: 0.4 + _c.value * 0.4,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: _C.formulaCardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _C.border),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Container(
-                    width: 60,
-                    height: 16,
-                    decoration: BoxDecoration(
-                        color: _C.skeletonBg, borderRadius: BorderRadius.circular(4))),
-                const SizedBox(width: 8),
-                Container(
-                    width: 100,
-                    height: 12,
-                    decoration: BoxDecoration(
-                        color: _C.skeletonBg, borderRadius: BorderRadius.circular(4))),
-              ]),
-              const SizedBox(height: 10),
-              Container(
-                  width: double.infinity,
-                  height: 44,
-                  decoration:
-                      BoxDecoration(color: _C.skeletonBg, borderRadius: BorderRadius.circular(12))),
-              const SizedBox(height: 8),
-              Container(
-                  width: 200,
-                  height: 10,
-                  decoration: BoxDecoration(
-                      color: _C.skeletonBg.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(4))),
-            ]),
-          ),
-        ),
-      );
-}
-
-// ─────────────────────────────────────────────────────────────
-// FILTER PILL
-// ─────────────────────────────────────────────────────────────
-class _FilterPill extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-  const _FilterPill({required this.label, required this.active, required this.onTap});
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: active ? _C.textDark : _C.chipBg,
-            border: Border.all(color: active ? _C.textDark : _C.chipBdr),
-            borderRadius: BorderRadius.circular(100),
-          ),
-          child: Text(label,
-              style: TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                  color: active ? Colors.white : _C.textDark)),
-        ),
-      );
-}
-
-// ─────────────────────────────────────────────────────────────
-// SHARED WIDGETS
-// ─────────────────────────────────────────────────────────────
-class _TopBar extends StatelessWidget {
-  final VoidCallback onBack;
-  final VoidCallback onUpload;
-  const _TopBar({required this.onBack, required this.onUpload});
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: Row(children: [
-          _IcoBtn(icon: Icons.arrow_back_ios_new_rounded, onTap: onBack),
-          const Expanded(
-            child: Center(
-              child: Text('AI Analysis',
-                  style: TextStyle(
-                      fontFamily: 'Syne',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: _C.textDark)),
-            ),
-          ),
-          _IcoBtn(icon: Icons.upload_rounded, onTap: onUpload),
-        ]),
-      );
-}
-
-// ─────────────────────────────────────────────────────────────
-// EMPTY STATE — shown when the screen opens with no file
-// ─────────────────────────────────────────────────────────────
-class _EmptyUpload extends StatelessWidget {
-  final VoidCallback onPick;
-  const _EmptyUpload({required this.onPick});
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: const BoxDecoration(
-                color: _C.textDark,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.auto_awesome_rounded, size: 34, color: _C.goldLight),
-            ),
-            const SizedBox(height: 18),
-            const Text('Upload a file to analyze',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontFamily: 'Syne',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: _C.textDark)),
-            const SizedBox(height: 6),
-            const Text(
-              'Pick a PDF, document, or image and AI will summarise it, extract formulas, and analyse visuals.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 12,
-                  color: _C.textMuted,
-                  height: 1.55,
-                  fontWeight: FontWeight.w300),
-            ),
-            const SizedBox(height: 22),
-            GestureDetector(
-              onTap: onPick,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_C.audioBtnA, _C.audioBtnB],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(13),
-                  boxShadow: [
-                    BoxShadow(
-                        color: _C.goldDark.withOpacity(0.40),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6)),
-                  ],
-                ),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.upload_rounded, size: 16, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('Upload File',
-                      style: TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white)),
-                ]),
-              ),
-            ),
-          ]),
-        ),
-      );
-}
-
-class _IcoBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _IcoBtn({required this.icon, required this.onTap});
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: _C.cardBg.withOpacity(0.85),
-            borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: _C.border),
-            boxShadow: [
-              BoxShadow(
-                  color: _C.textDark.withOpacity(0.06), blurRadius: 6, offset: const Offset(0, 2))
-            ],
-          ),
-          child: Icon(icon, size: 14, color: _C.textDark),
-        ),
-      );
-}
-
-class _HeroBadge extends StatelessWidget {
-  final String label;
-  final bool filled;
-  const _HeroBadge({required this.label, required this.filled});
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(filled ? 0.14 : 0.08),
-          border: Border.all(color: Colors.white.withOpacity(0.22)),
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                fontFamily: 'DM Sans',
-                fontSize: 10.5,
-                fontWeight: filled ? FontWeight.w700 : FontWeight.w400,
-                color: filled ? _C.goldLight : Colors.white70)),
       );
 }
 
@@ -1708,102 +1450,5 @@ class _AskAIStrip extends StatelessWidget {
             const Icon(Icons.chevron_right_rounded, size: 20, color: _C.goldDark),
           ]),
         ),
-      );
-}
-
-class _Msg {
-  final String text;
-  final bool isUser;
-  const _Msg({required this.text, required this.isUser});
-}
-
-class _ChatBubble extends StatelessWidget {
-  final _Msg msg;
-  const _ChatBubble({required this.msg});
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(
-          mainAxisAlignment: msg.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (!msg.isUser) ...[
-              Container(
-                width: 28,
-                height: 28,
-                margin: const EdgeInsets.only(right: 7),
-                decoration: const BoxDecoration(color: _C.textDark, shape: BoxShape.circle),
-                child: const Center(
-                    child: Icon(Icons.auto_awesome_rounded, size: 13, color: _C.goldLight)),
-              ),
-            ],
-            Flexible(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-                decoration: BoxDecoration(
-                  color: msg.isUser ? _C.bubbleUser : _C.bubbleAI,
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(16),
-                    topRight: const Radius.circular(16),
-                    bottomLeft: Radius.circular(msg.isUser ? 16 : 4),
-                    bottomRight: Radius.circular(msg.isUser ? 4 : 16),
-                  ),
-                  border: msg.isUser ? null : Border.all(color: _C.border),
-                  boxShadow: [
-                    BoxShadow(
-                        color: _C.textDark.withOpacity(0.06),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2))
-                  ],
-                ),
-                child: Text(msg.text,
-                    style: TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 13,
-                        color: msg.isUser ? Colors.white : _C.textDark,
-                        height: 1.55,
-                        fontWeight: FontWeight.w300)),
-              ),
-            ),
-            if (msg.isUser) const SizedBox(width: 4),
-          ],
-        ),
-      );
-}
-
-class _TypingBubble extends StatelessWidget {
-  const _TypingBubble();
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Container(
-            width: 28,
-            height: 28,
-            margin: const EdgeInsets.only(right: 7),
-            decoration: const BoxDecoration(color: _C.textDark, shape: BoxShape.circle),
-            child: const Center(
-                child: Icon(Icons.auto_awesome_rounded, size: 13, color: _C.goldLight)),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-            decoration: BoxDecoration(
-              color: _C.bubbleAI,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-                bottomLeft: Radius.circular(4),
-              ),
-              border: Border.all(color: _C.border),
-            ),
-            child: const Text('typing...',
-                style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 12,
-                    color: _C.textMuted,
-                    fontStyle: FontStyle.italic)),
-          ),
-        ]),
       );
 }

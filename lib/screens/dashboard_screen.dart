@@ -174,7 +174,7 @@ class DashboardScreen extends ConsumerWidget {
                   child: Column(children: [
                     // ── Hero card — Active Plan ───────────────
                     GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, '/study_plan_screen'),
+                      onTap: () => Navigator.pushNamed(context, '/study-plan'),
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
                         child: Container(
