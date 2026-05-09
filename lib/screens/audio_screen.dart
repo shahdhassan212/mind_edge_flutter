@@ -340,7 +340,7 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
           decoration: BoxDecoration(
-            // 1. استخدام التدرج المرجعي (البيج/الذهبي للبني)
+           
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -357,7 +357,6 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
             ],
           ),
           child: Stack(children: [
-            // 2. الدائرة الداخلية بلون فاتح عشان تدي إضاءة للكارت
             Positioned(
               top: -30,
               right: -30,
@@ -400,8 +399,7 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
                       color: Colors.white.withOpacity(0.8),
                       fontWeight: FontWeight.w400)),
             ]),
-            // الـ Mini Robot هيفضل مكانه وهيظهر بشكل أجمل على التدرج الجديد
-            Positioned(
+           Positioned(
               right: 0,
               bottom: 0,
               child: _FloatingMiniBot(),

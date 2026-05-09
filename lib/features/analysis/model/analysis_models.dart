@@ -22,6 +22,7 @@ class VisualAnalysisModel {
   final String correctedText;
   final int graphsAnalyzed;
   final List<GraphAnalysis> graphs;
+  final String sessionId;
 
   const VisualAnalysisModel({
     required this.status,
@@ -30,10 +31,10 @@ class VisualAnalysisModel {
     required this.correctedText,
     required this.graphsAnalyzed,
     required this.graphs,
+    required this.sessionId,
   });
 
-  factory VisualAnalysisModel.fromJson(Map<String, dynamic> j) =>
-      VisualAnalysisModel(
+  factory VisualAnalysisModel.fromJson(Map<String, dynamic> j) => VisualAnalysisModel(
         status: j['status']?.toString() ?? '',
         documentName: j['document_name']?.toString() ?? '',
         rawText: j['raw_text']?.toString() ?? '',
@@ -42,6 +43,7 @@ class VisualAnalysisModel {
         graphs: (j['graphs'] as List<dynamic>? ?? [])
             .map((e) => GraphAnalysis.fromJson(e as Map<String, dynamic>))
             .toList(),
+        sessionId: j['session_id']?.toString() ?? '',
       );
 }
 
@@ -57,8 +59,7 @@ class AudioSummaryModel {
     this.audioUrl,
   });
 
-  factory AudioSummaryModel.fromJson(Map<String, dynamic> j) =>
-      AudioSummaryModel(
+  factory AudioSummaryModel.fromJson(Map<String, dynamic> j) => AudioSummaryModel(
         filename: j['filename']?.toString() ?? '',
         summary: j['summary']?.toString() ?? '',
         audioUrl: j['audio_url']?.toString(),
@@ -87,23 +88,13 @@ class RulesModel {
 
   /// Split the raw string into individual rule entries.
   /// Each non-blank line is treated as one rule.
-  List<String> get ruleLines => rawRules
-      .split('\n')
-      .map((l) => l.trim())
-      .where((l) => l.isNotEmpty)
-      .toList();
+  List<String> get ruleLines =>
+      rawRules.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
 }
 
-// ── Definitions (get-definitions) ────────────────────────────
-// Response after double-decode:
-//   { "filename": "...", "definitions": "<markdown string>" }
-//
-// The "definitions" value is a markdown string — rendered as-is
-// using the existing _MarkdownText widget.
 class DefinitionsModel {
   final String filename;
 
-  /// Raw markdown string exactly as returned by the API.
   final String markdownContent;
 
   const DefinitionsModel({
@@ -111,8 +102,7 @@ class DefinitionsModel {
     required this.markdownContent,
   });
 
-  factory DefinitionsModel.fromJson(Map<String, dynamic> j) =>
-      DefinitionsModel(
+  factory DefinitionsModel.fromJson(Map<String, dynamic> j) => DefinitionsModel(
         filename: j['filename']?.toString() ?? '',
         markdownContent: j['definitions']?.toString() ?? '',
       );
