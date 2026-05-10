@@ -16,7 +16,6 @@ import '../screens/scan_screen.dart';
 import '../screens/ocr_processing_screen.dart';
 import '../screens/ai_result_screen.dart';
 import '../screens/study_plan_screen.dart';
-import '../screens/progress_screen.dart';
 import '../screens/audio_screen.dart';
 import '../screens/quiz_screen.dart';
 import '../screens/quiz_result_screen.dart';
@@ -32,7 +31,6 @@ class AppRouter {
     Widget? page;
 
     switch (s.name) {
-      // ── Auth Flow ──────────────────────────────────────────
       case '/':
         page = const SplashScreen();
         break;
@@ -56,7 +54,6 @@ class AppRouter {
         page = VerifyEmailScreen(email: email);
         break;
 
-      // ── Forgot Password Flow ───────────────────────────────
       case '/forgot-email':
         page = const ForgotPasswordEmailScreen();
         break;
@@ -75,7 +72,6 @@ class AppRouter {
         page = const ForgotPasswordSuccessScreen();
         break;
 
-      // ── Main App Features ──────────────────────────────────
       case '/dashboard':
         page = const DashboardScreen();
         break;
@@ -89,8 +85,6 @@ class AppRouter {
         page = const ScanScreen();
         break;
 
-      // AIAnalysisScreen — filePath/fileName are optional.
-      // Without arguments the screen shows an upload empty state.
       case '/ai-analysis':
         final raw = s.arguments;
         String? filePath;
@@ -107,8 +101,6 @@ class AppRouter {
           displayName: fileName ?? filePath?.split('/').last,
         );
         break;
-
-      // AIChatScreen — receives fileName from AIAnalysisScreen ← NEW
       case '/ai-chat':
         final args = s.arguments as Map<String, dynamic>? ?? {};
         page = AIChatScreen(
@@ -129,9 +121,6 @@ class AppRouter {
       case '/ai-result':
         page = const AiResultScreen();
         break;
-      case '/progress':
-        page = const ProgressScreen();
-        break;
       case '/quiz':
         page = const QuizScreen();
         break;
@@ -142,9 +131,7 @@ class AppRouter {
       default:
         page = null;
     }
-
     if (page == null) return null;
-
     return PageRouteBuilder(
       settings: s,
       pageBuilder: (context, animation, secondaryAnimation) => page!,

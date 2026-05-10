@@ -1,9 +1,7 @@
-// ============================================================
-// Page 10 — Forgot Password: Success
-// ============================================================
+// screens/forgot_password_success.dart
 import 'package:flutter/material.dart';
 import '../theme/design_tokens.dart';
-import '../animations/animation_helpers.dart';
+import '../widgets/animation_helpers.dart';
 import '../widgets/common_widgets.dart';
 
 class ForgotPasswordSuccessScreen extends StatelessWidget {
@@ -12,7 +10,6 @@ class ForgotPasswordSuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF4E8),
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -20,37 +17,15 @@ class ForgotPasswordSuccessScreen extends StatelessWidget {
             gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: [0.0, 1.0],
                 colors: [Color(0xFFFDFAF4), Color(0xFFF5EBD6)])),
         child: Stack(children: [
-          Positioned(
-              top: -60,
-              right: -60,
-              child: Container(
-                  width: 280,
-                  height: 280,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                          colors: [AppColors.gold.withOpacity(0.12), Colors.transparent],
-                          radius: 0.68)))),
-          Positioned(
-              bottom: -80,
-              left: -80,
-              child: Container(
-                  width: 260,
-                  height: 260,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                          colors: [AppColors.cocoa.withOpacity(0.08), Colors.transparent],
-                          radius: 0.68)))),
+          AppDecorOrb(top: -60, right: -60, size: 280, color: AppColors.gold.withOpacity(0.12)),
+          AppDecorOrb(bottom: -80, left: -80, size: 260, color: AppColors.cocoa.withOpacity(0.08)),
           SafeArea(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Success circle
                 FadeUpEntrance(
                   delay: Duration.zero,
                   child: Center(
@@ -61,7 +36,7 @@ class ForgotPasswordSuccessScreen extends StatelessWidget {
                         shape: BoxShape.circle,
                         gradient: RadialGradient(colors: [
                           AppColors.gold.withOpacity(0.14),
-                          AppColors.cocoa.withOpacity(0.07)
+                          AppColors.cocoa.withOpacity(0.07),
                         ]),
                         border: Border.all(color: AppColors.gold.withOpacity(0.35), width: 2),
                         boxShadow: [
@@ -81,10 +56,7 @@ class ForgotPasswordSuccessScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 26),
-
-                // Heading
                 FadeUpEntrance(
                   delay: const Duration(milliseconds: 150),
                   child: const Text('Password updated\nsuccessfully',
@@ -94,12 +66,10 @@ class ForgotPasswordSuccessScreen extends StatelessWidget {
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
                           color: AppColors.cocoaDeep,
-                          letterSpacing: -0.025 * 24,
+                          letterSpacing: -0.6,
                           height: 1.2)),
                 ),
-
                 const SizedBox(height: 10),
-
                 FadeUpEntrance(
                   delay: const Duration(milliseconds: 250),
                   child: const Padding(
@@ -114,14 +84,12 @@ class ForgotPasswordSuccessScreen extends StatelessWidget {
                             height: 1.65)),
                   ),
                 ),
-
                 const SizedBox(height: 32),
-
                 FadeUpEntrance(
                   delay: const Duration(milliseconds: 350),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: PrimaryButton(
+                    child: AppButton(
                       label: 'Continue to Sign In',
                       gradient: AppGradients.ctaButtonFinal,
                       onTap: () =>

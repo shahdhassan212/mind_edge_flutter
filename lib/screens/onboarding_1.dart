@@ -1,11 +1,9 @@
-// ============================================================
-// Screen 02: Onboarding 1 — Scan & Understand Any Document
-// ============================================================
-
+// screens/onboarding_1.dart
 import 'package:flutter/material.dart';
 import '../theme/design_tokens.dart';
-import '../animations/animation_helpers.dart';
+import '../widgets/animation_helpers.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/onboarding_helpers.dart';
 
 class OnboardingScreen1 extends StatelessWidget {
   const OnboardingScreen1({super.key});
@@ -16,7 +14,6 @@ class OnboardingScreen1 extends StatelessWidget {
     final isSmall = size.height < 700;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF4E8),
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -25,52 +22,13 @@ class OnboardingScreen1 extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Top bar
-              Padding(
-                padding: EdgeInsets.fromLTRB(28, isSmall ? 6 : 10, 28, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    RichText(
-                        text: const TextSpan(children: [
-                      TextSpan(
-                          text: 'Mind',
-                          style: TextStyle(
-                              fontFamily: 'Syne',
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.cocoaDeep,
-                              letterSpacing: -0.2)),
-                      TextSpan(
-                          text: 'Edge',
-                          style: TextStyle(
-                              fontFamily: 'Syne',
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.cocoa,
-                              letterSpacing: -0.2)),
-                    ])),
-                    GestureDetector(
-                      onTap: () =>
-                          Navigator.pushNamedAndRemoveUntil(context, '/signin', (_) => false),
-                      child: const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Text('Skip',
-                            style: TextStyle(
-                                fontFamily: 'DM Sans',
-                                fontSize: 13,
-                                color: AppColors.muted,
-                                fontWeight: FontWeight.w400)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ObTopBar(isSmall: isSmall),
 
               // ── Illustration
               Expanded(
                 child: LayoutBuilder(builder: (context, constraints) {
                   final cardW = (constraints.maxWidth - 56).clamp(180.0, 240.0);
+                  final offset = (constraints.maxWidth - cardW) / 2 - 50;
                   return Center(
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: isSmall ? 10 : 20),
@@ -78,45 +36,23 @@ class OnboardingScreen1 extends StatelessWidget {
                         clipBehavior: Clip.none,
                         alignment: Alignment.center,
                         children: [
-                          // Main card
                           _ObCard1(width: cardW),
-
-                          // OCR Active badge — top right
                           Positioned(
                             top: -16,
-                            right: (constraints.maxWidth - cardW) / 2 - 50,
+                            right: offset,
                             child: FloatWidget(
                               duration: AppDuration.floatA,
                               delay: const Duration(milliseconds: 300),
                               translateYMax: -5,
-                              child: FloatingBadge(
+                              child: const FloatingBadge(
                                 label: '🔍 OCR Active',
                                 showLiveDot: true,
-                                // التعديل هنا: هنمرر الـ decoration للـ Widget مباشرة
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFFC9A96E), Color(0xFF7C5642)],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      // استخدمت لون أسود بـ opacity لأن الـ _c مش متعرفة
-                                      color: const Color(0xFF000000).withOpacity(0.32),
-                                      blurRadius: 15,
-                                      offset: const Offset(0, 4),
-                                    )
-                                  ],
-                                ),
                               ),
                             ),
                           ),
-
-                          // 98% Accuracy badge — bottom left
                           Positioned(
                             bottom: -10,
-                            left: (constraints.maxWidth - cardW) / 2 - 50,
+                            left: offset,
                             child: FloatWidget(
                               duration: AppDuration.floatB,
                               delay: const Duration(milliseconds: 600),
@@ -124,44 +60,26 @@ class OnboardingScreen1 extends StatelessWidget {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(
-                                  // التعديل: التدرج اللوني المرجعي (البيج للبني)
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFFC9A96E), Color(0xFF7C5642)],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(100),
-                                  boxShadow: [
+                                  gradient: AppGradients.badge,
+                                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                                  boxShadow: const [
                                     BoxShadow(
-                                      // التعديل: الظل الموحد مع opacity 0.32
-                                      color: const Color(0xFF000000).withOpacity(0.32),
-                                      blurRadius: 24,
-                                      offset: const Offset(0, 8),
-                                    )
+                                        color: Color(0x52000000),
+                                        blurRadius: 24,
+                                        offset: Offset(0, 8))
                                   ],
                                 ),
-                                child: Row(
+                                child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Text(
-                                      '✦',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color:
-                                            Colors.white, // خليتها أبيض عشان تنطق مع التدرج الجديد
-                                      ),
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      '98% Accuracy',
-                                      style: TextStyle(
-                                        fontFamily: 'DM Sans',
-                                        fontSize: 11,
-                                        fontWeight:
-                                            FontWeight.w600, // خليتها w600 زي الزرار المرجعي
-                                        color: Colors.white, // اللون الأبيض الموحد
-                                      ),
-                                    ),
+                                    Text('✦', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                    SizedBox(width: 5),
+                                    Text('98% Accuracy',
+                                        style: TextStyle(
+                                            fontFamily: 'DM Sans',
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white)),
                                   ],
                                 ),
                               ),
@@ -175,7 +93,7 @@ class OnboardingScreen1 extends StatelessWidget {
               ),
 
               // ── Bottom content
-              Container(
+              Padding(
                 padding: EdgeInsets.fromLTRB(28, 0, 28, isSmall ? 20 : 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,68 +101,23 @@ class OnboardingScreen1 extends StatelessWidget {
                   children: [
                     const OnboardingDots(total: 3, active: 0),
                     SizedBox(height: isSmall ? 10 : 16),
-                    RichText(
-                        text: const TextSpan(children: [
-                      TextSpan(
-                          text: 'Scan & ',
-                          style: TextStyle(
-                              fontFamily: 'Syne',
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.cocoaDeep,
-                              letterSpacing: -0.5,
-                              height: 1.2)),
-                      TextSpan(
-                          text: 'Understand',
-                          style: TextStyle(
-                              fontFamily: 'Syne',
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.cocoa,
-                              letterSpacing: -0.5,
-                              height: 1.2)),
-                      TextSpan(
-                          text: ' Any\nDocument',
-                          style: TextStyle(
-                              fontFamily: 'Syne',
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.cocoaDeep,
-                              letterSpacing: -0.5,
-                              height: 1.2)),
-                    ])),
+                    ObTitle(
+                      parts: const [
+                        ('Scan & ', true),
+                        ('Understand', false),
+                        (' Any\nDocument', true),
+                      ],
+                    ),
                     SizedBox(height: isSmall ? 6 : 10),
-                    const Text(
-                        'Upload or scan handwritten notes, PDFs, and textbooks. Our AI extracts and structures everything instantly.',
-                        style: TextStyle(
-                            fontFamily: 'DM Sans',
-                            fontSize: 12.5,
-                            color: Color(0xFF6B4C3B),
-                            fontWeight: FontWeight.w300,
-                            height: 1.6)),
+                    const ObBody(
+                      'Upload or scan handwritten notes, PDFs, and textbooks. '
+                      'Our AI extracts and structures everything instantly.',
+                    ),
                     SizedBox(height: isSmall ? 14 : 20),
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFC9A96E), Color(0xFF7C5642)],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF000000).withOpacity(0.32),
-                            blurRadius: 28,
-                            offset: const Offset(0, 8),
-                          )
-                        ],
-                      ),
-                      child: PrimaryButton(
-                        label: 'Continue →',
-                        onTap: () => Navigator.pushNamed(context, '/onboarding2'),
-                        shimmerDelay: const Duration(seconds: 2),
-                      ),
-                    )
+                    AppButton(
+                      label: 'Continue →',
+                      onTap: () => Navigator.pushNamed(context, '/onboarding2'),
+                    ),
                   ],
                 ),
               ),
@@ -256,9 +129,7 @@ class OnboardingScreen1 extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// ILLUSTRATION CARD
-// ─────────────────────────────────────────────────────────────
+// ─── Illustration card ─────────────────────────────────────────
 class _ObCard1 extends StatelessWidget {
   final double width;
   const _ObCard1({required this.width});
@@ -269,7 +140,7 @@ class _ObCard1 extends StatelessWidget {
       width: width,
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.78),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.obCard),
         border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.18), width: 1),
         boxShadow: [
           BoxShadow(
@@ -279,52 +150,48 @@ class _ObCard1 extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.obCard),
         child: Stack(children: [
-          // Top accent bar
           Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                  height: 3,
-                  decoration: const BoxDecoration(
-                      gradient: AppGradients.cardTopAccent,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(24))))),
-
-          // Content
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 3,
+              decoration: const BoxDecoration(
+                gradient: AppGradients.cardTopAccent,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              // PDF document icon
-              Center(child: _PdfDocIcon()),
+              const Center(child: _PdfDocIcon()),
               const SizedBox(height: 14),
-              const Text('Scan any document',
-                  style: TextStyle(
-                      fontFamily: 'DM Sans',
-                      fontSize: 11,
-                      color: AppColors.muted,
-                      fontWeight: FontWeight.w300,
-                      height: 1.5),
-                  textAlign: TextAlign.center),
+              const Text(
+                'Scan any document',
+                style: TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 11,
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w300,
+                    height: 1.5),
+                textAlign: TextAlign.center,
+              ),
             ]),
           ),
-
-          // Scan beam animation
-          const Positioned.fill(
-            child: ScanBeamWidget(),
-          ),
+          const Positioned.fill(child: ScanBeamWidget()),
         ]),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// PDF DOCUMENT ICON
-// ─────────────────────────────────────────────────────────────
 class _PdfDocIcon extends StatelessWidget {
   const _PdfDocIcon();
+
+  static const _widths = [1.0, 0.85, 0.7, 0.9, 0.6];
 
   @override
   Widget build(BuildContext context) {
@@ -342,12 +209,11 @@ class _PdfDocIcon extends StatelessWidget {
               offset: const Offset(0, 3))
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      padding: const EdgeInsets.all(10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // PDF label
-          Text('PDF',
+          const Text('PDF',
               style: TextStyle(
                   fontFamily: 'DM Sans',
                   fontSize: 8.5,
@@ -355,28 +221,21 @@ class _PdfDocIcon extends StatelessWidget {
                   color: AppColors.gold,
                   letterSpacing: 0.3)),
           const SizedBox(height: 8),
-          // Text lines
-          ..._lines(),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _lines() {
-    final widths = [1.0, 0.85, 0.7, 0.9, 0.6];
-    return widths
-        .map((w) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: FractionallySizedBox(
-                widthFactor: w,
-                alignment: Alignment.centerLeft,
-                child: Container(
+          ..._widths.map((w) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: FractionallySizedBox(
+                  widthFactor: w,
+                  alignment: Alignment.centerLeft,
+                  child: Container(
                     height: 4,
                     decoration: BoxDecoration(
                         color: AppColors.cocoa.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(2))),
-              ),
-            ))
-        .toList();
+                        borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+              )),
+        ],
+      ),
+    );
   }
 }

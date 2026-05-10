@@ -3,7 +3,7 @@
 // ============================================================
 import 'package:flutter/material.dart';
 import '../theme/design_tokens.dart';
-import '../animations/animation_helpers.dart';
+import '../widgets/animation_helpers.dart';
 import '../widgets/common_widgets.dart';
 
 class QuizScreen extends StatefulWidget {

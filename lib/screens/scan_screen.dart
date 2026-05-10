@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../theme/design_tokens.dart';
-import '../animations/animation_helpers.dart';
+import '../widgets/animation_helpers.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});

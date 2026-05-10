@@ -1,7 +1,7 @@
 // screens/splash_screen.dart — with real session check
 import 'package:flutter/material.dart';
 import '../theme/design_tokens.dart';
-import '../animations/animation_helpers.dart';
+import '../widgets/animation_helpers.dart';
 import '../widgets/robot_widget.dart';
 import '../core/token_storage.dart';
 

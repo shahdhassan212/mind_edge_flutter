@@ -33,6 +33,49 @@ class AppColors {
   static Color text35 = const Color(0xFFF5EFE4).withOpacity(0.35);
   static Color text88 = const Color(0xFFF5EFE4).withOpacity(0.88);
 
+  // ── Dashboard palette ─────────────────────────────────────
+  static const Color dashBgTop = Color(0xFFF7EDD8);
+  static const Color dashBgMid = Color(0xFFF0E0C0);
+  static const Color dashBgBottom = Color(0xFFE8D0A8);
+  static const Color dashHeroCard = Color(0xFF2A1A0E);
+  static const Color dashHeroCircle = Color(0x667A6035);
+  static const Color dashBadgeBg = Color(0xFF3D2510);
+  static const Color dashBadgeBorder = Color(0xFF5A3A18);
+  static const Color dashGoldDark = Color(0xFFC9943A);
+  static const Color dashGoldLight = Color(0xFFE8B84B);
+  static const Color dashNameAmber = Color(0xFFC08B3A);
+  static const Color dashTextDark = Color(0xFF2A1A0E);
+  static const Color dashTextMuted = Color(0xFF9E8A72);
+  static const Color dashSurface = Color(0xFFFEFCF7);
+  static const Color dashBorder = Color(0xFFE8D9C0);
+  static const Color dashNavBorder = Color(0xFFE0CDB0);
+  static const Color dashResumeBtn = Color(0x33FFFFFF);
+  static const Color dashResumeBorder = Color(0x55FFFFFF);
+
+  // ── AI Analysis palette ───────────────────────────────────
+  static const Color aiPageBg = Color(0xFFF4EDE0);
+  static const Color aiCardBg = Color(0xFFFEFCF7);
+  static const Color aiHeroCard = Color(0xFF201410);
+  static const Color aiTextDark = Color(0xFF2A1A0E);
+  static const Color aiTextBody = Color(0xFF3A2410);
+  static const Color aiTextMuted = Color(0xFF9E8A72);
+  static const Color aiTextHint = Color(0xFFB8A88A);
+  static const Color aiBorder = Color(0xFFE8D9C0);
+  static const Color aiBorderDash = Color(0xFFE0C898);
+  static const Color aiChipBg = Color(0xFFF0E8D8);
+  static const Color aiChipBorder = Color(0xFFDDD0B8);
+  static const Color aiHeroDeco1 = Color(0x2EC9943A);
+  static const Color aiHeroDeco2 = Color(0x18C9943A);
+  static const Color aiGoldDark = Color(0xFFC9943A);
+  static const Color aiGoldLight = Color(0xFFE8B84B);
+  static const Color aiFormulaCardBg = Color(0xFFFAF6EE);
+  static const Color aiFormulaTagBg = Color(0xFF2A1A0E);
+  static const Color aiFormulaTagText = Color(0xFFE8B84B);
+  static const Color aiSkeletonBg = Color(0xFFEDE0C8);
+  static const Color aiErrorBg = Color(0xFFFFF0F0);
+  static const Color aiErrorBorder = Color(0xFFFFCCCC);
+  static const Color aiErrorText = Color(0xFFB94040);
+
   // Warm tinted shadow bases
   static const Color shadowWarm1 = Color(0xFF643C14); // rgba(100,60,20)
   static const Color shadowWarm2 = Color(0xFF502D14); // rgba(80,45,20)

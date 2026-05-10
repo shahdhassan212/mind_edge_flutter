@@ -51,8 +51,7 @@ class SignOutNotifier extends StateNotifier<AuthState> {
   }
 }
 
-final signOutProvider =
-    StateNotifierProvider.autoDispose<SignOutNotifier, AuthState>(
+final signOutProvider = StateNotifierProvider.autoDispose<SignOutNotifier, AuthState>(
   (ref) => SignOutNotifier(ref.read(authViewModelProvider.notifier)),
 );
 
@@ -64,25 +63,21 @@ class VerifyEmailNotifier extends StateNotifier<AuthState> {
 
   Future<void> verify({required String email, required String otp}) async {
     state = AuthLoading();
-    final success =
-        await _authVM.verifyEmail(VerifyOtpRequest(email: email, otp: otp));
-    state = success
-        ? EmailVerified()
-        : AuthError(_authVM.lastError?.message ?? 'Verification failed');
+    final success = await _authVM.verifyEmail(VerifyOtpRequest(email: email, otp: otp));
+    state =
+        success ? EmailVerified() : AuthError(_authVM.lastError?.message ?? 'Verification failed');
   }
 
   Future<void> resend({required String email}) async {
     state = AuthLoading();
-    final success =
-        await _authVM.resendOtp(ResendOtpRequest(email: email));
+    final success = await _authVM.resendOtp(ResendOtpRequest(email: email));
     state = success
         ? OtpResent('Code resent successfully')
         : AuthError(_authVM.lastError?.message ?? 'Failed to resend code');
   }
 }
 
-final verifyEmailProvider =
-    StateNotifierProvider.autoDispose<VerifyEmailNotifier, AuthState>(
+final verifyEmailProvider = StateNotifierProvider.autoDispose<VerifyEmailNotifier, AuthState>(
   (ref) => VerifyEmailNotifier(ref.read(authViewModelProvider.notifier)),
 );
 
@@ -306,14 +301,10 @@ final signUpVMProvider = ChangeNotifierProvider.autoDispose(
 // FORGOT PASSWORD — Email Form ViewModel
 // ═════════════════════════════════════════════════════════════════════════════
 class ForgotPasswordEmailViewModel extends ChangeNotifier {
-  ForgotPasswordEmailViewModel({required AuthViewModel authVM}) : _authVM = authVM {
-    emailFocus.addListener(_onFocusChange);
-  }
+  ForgotPasswordEmailViewModel({required AuthViewModel authVM}) : _authVM = authVM;
 
   final AuthViewModel _authVM;
   final emailCtrl = TextEditingController();
-  final emailFocus = FocusNode();
-  bool emailFocused = false;
 
   ForgotEmailStatus? status;
   String? sentEmail;
@@ -324,11 +315,6 @@ class ForgotPasswordEmailViewModel extends ChangeNotifier {
     status = null;
     sentEmail = null;
     errorMessage = null;
-    notifyListeners();
-  }
-
-  void _onFocusChange() {
-    emailFocused = emailFocus.hasFocus;
     notifyListeners();
   }
 
@@ -352,8 +338,7 @@ class ForgotPasswordEmailViewModel extends ChangeNotifier {
     notifyListeners();
 
     final email = emailCtrl.text.trim();
-    final success =
-        await _authVM.forgotPassword(ForgotPasswordRequest(email: email));
+    final success = await _authVM.forgotPassword(ForgotPasswordRequest(email: email));
 
     isLoading = false;
     if (success) {
@@ -368,9 +353,6 @@ class ForgotPasswordEmailViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    emailFocus
-      ..removeListener(_onFocusChange)
-      ..dispose();
     emailCtrl.dispose();
     super.dispose();
   }
@@ -397,8 +379,7 @@ class ForgotPasswordCodeViewModel extends ChangeNotifier {
   final String email;
   final AuthViewModel _authVM;
 
-  final List<TextEditingController> otpCtrls =
-      List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> otpCtrls = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> focusNodes = List.generate(6, (_) => FocusNode());
 
   int _seconds = 8 * 60 + 34;
@@ -438,8 +419,7 @@ class ForgotPasswordCodeViewModel extends ChangeNotifier {
     status = null;
     notifyListeners();
 
-    final success =
-        await _authVM.forgotPassword(ForgotPasswordRequest(email: email));
+    final success = await _authVM.forgotPassword(ForgotPasswordRequest(email: email));
 
     isLoading = false;
     if (success) {
@@ -595,13 +575,8 @@ final forgotNewPassVMProvider = ChangeNotifierProvider.autoDispose(
     authVM: ref.read(authViewModelProvider.notifier),
   ),
 );
-
-// ═════════════════════════════════════════════════════════════════════════════
-// EMAIL VERIFICATION — Form ViewModel (post sign-up)
-// ═════════════════════════════════════════════════════════════════════════════
 class VerifyEmailViewModel extends ChangeNotifier {
-  VerifyEmailViewModel({required this.email, required AuthViewModel authVM})
-      : _authVM = authVM {
+  VerifyEmailViewModel({required this.email, required AuthViewModel authVM}) : _authVM = authVM {
     for (final n in focusNodes) {
       n.addListener(notifyListeners);
     }
@@ -610,8 +585,7 @@ class VerifyEmailViewModel extends ChangeNotifier {
   final String email;
   final AuthViewModel _authVM;
 
-  final List<TextEditingController> otpCtrls =
-      List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> otpCtrls = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> focusNodes = List.generate(6, (_) => FocusNode());
 
   String get otp => otpCtrls.map((c) => c.text).join();

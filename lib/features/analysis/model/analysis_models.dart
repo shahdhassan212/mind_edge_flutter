@@ -66,13 +66,6 @@ class AudioSummaryModel {
       );
 }
 
-// ── Rules (get-rules) ─────────────────────────────────────────
-// Response after double-decode:
-//   { "filename": "...", "rules": "<rule text / markdown>" }
-//
-// The "rules" value is a plain string — could be a single rule,
-// multiple rules separated by newlines, or light markdown.
-// We split on newlines and render each non-empty line as a rule card.
 class RulesModel {
   final String filename;
 
@@ -123,12 +116,12 @@ class AnalysisState {
   final AudioSummaryModel? summaryData;
   final String? summaryError;
 
-  // Rules  (replaces FormulaItem list)
+  // Rules  
   final LoadStatus rulesStatus;
   final RulesModel? rulesData;
   final String? rulesError;
 
-  // Definitions  (replaces DefinitionItem list)
+  // Definitions  
   final LoadStatus definitionStatus;
   final DefinitionsModel? definitionsData;
   final String? definitionError;

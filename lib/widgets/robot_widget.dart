@@ -382,7 +382,6 @@ class _BookWidgetState extends State<BookWidget> with TickerProviderStateMixin {
             // Book cover / spine (always behind pages)
             _buildBookBase(),
 
-            // Left page — rotates around its right edge
             AnimatedBuilder(
               animation: _leftCtrl,
               builder: (_, __) {
@@ -527,9 +526,6 @@ class _BookWidgetState extends State<BookWidget> with TickerProviderStateMixin {
   }
 }
 
-// ─── Curve: peaks at t=0.4 (when page is edge-on), zero at start/end ──
-// t is ALWAYS in [0,1] because it comes from the AnimationController directly.
-// Triangle wave: rises 0→1 over first 40%, falls 1→0 over remaining 60%.
 class _MidPeakCurve extends Curve {
   const _MidPeakCurve();
 
