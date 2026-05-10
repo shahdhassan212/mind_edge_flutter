@@ -332,9 +332,13 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
 
   // ── Bottom bar ────────────────────────────────────────────────
   Widget _buildBottomBar(BuildContext context) {
-    final summaryData =
-        _fileName != null ? ref.watch(analysisViewModelProvider(_fileName!)).summaryData : null;
+    final analysisState =
+        _fileName != null ? ref.watch(analysisViewModelProvider(_fileName!)) : null;
+    final summaryData = analysisState?.summaryData;
     final audioReady = (summaryData?.audioUrl ?? '').isNotEmpty;
+
+    // documentName is what the server stored the file as — required by quiz API
+    final serverFilename = analysisState?.visualData?.documentName ?? _fileName ?? '';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
@@ -351,7 +355,14 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
       child: Row(children: [
         Expanded(
           child: GestureDetector(
-            onTap: () => Navigator.pushNamed(context, '/quiz'),
+            onTap: () => Navigator.pushNamed(
+              context,
+              '/quiz',
+              arguments: {
+                'filename': serverFilename,
+                'numQuestions': 10,
+              },
+            ),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 13),
               decoration: BoxDecoration(

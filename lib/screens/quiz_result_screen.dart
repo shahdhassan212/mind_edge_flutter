@@ -1,17 +1,18 @@
 // screens/quiz_result_screen.dart
 import 'package:flutter/material.dart';
+import '../features/analysis/model/quiz_models.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/common_widgets.dart';
 
 class QuizResultScreen extends StatelessWidget {
-  const QuizResultScreen({super.key});
+  final QuizSubmitResponse result;
+  final String filename;
 
-  static const _breakdown = [
-    ('Q1', 'Bond polarity and electronegativity', true),
-    ('Q2', 'Orbital hybridization in alkenes', true),
-    ('Q3', 'SN1 vs SN2 mechanism comparison', true),
-    ('Q4', "Markovnikov's rule application", false),
-  ];
+  const QuizResultScreen({
+    super.key,
+    required this.result,
+    required this.filename,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -24,11 +25,7 @@ class QuizResultScreen extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             stops: [0.0, 0.5, 1.0],
-            colors: [
-              Color(0xFFFDFAF4),
-              Color(0xFFF4E8D6),
-              Color(0xFFECDAC0),
-            ],
+            colors: [Color(0xFFFDFAF4), Color(0xFFF4E8D6), Color(0xFFECDAC0)],
           ),
         ),
         child: Stack(children: [
@@ -48,7 +45,6 @@ class QuizResultScreen extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           color: AppColors.cocoaDeep)),
                   const Spacer(),
-                  // Share button
                   Container(
                     width: 36,
                     height: 36,
@@ -77,18 +73,20 @@ class QuizResultScreen extends StatelessWidget {
                           width: 96,
                           height: 96,
                           child: CustomPaint(
-                            painter: _ScoreRingPainter(0.78),
-                            child: const Center(
+                            painter: _ScoreRingPainter(result.percentage),
+                            child: Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text('78%',
-                                      style: TextStyle(
-                                          fontFamily: 'Syne',
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.cocoaDeep)),
-                                  Text('Score',
+                                  Text(
+                                    '${(result.percentage * 100).round()}%',
+                                    style: const TextStyle(
+                                        fontFamily: 'Syne',
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.cocoaDeep),
+                                  ),
+                                  const Text('Score',
                                       style: TextStyle(
                                           fontFamily: 'DM Sans',
                                           fontSize: 9,
@@ -99,20 +97,24 @@ class QuizResultScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        const Text('Good work, Alex',
-                            style: TextStyle(
-                                fontFamily: 'Syne',
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.cocoaDeep,
-                                letterSpacing: -0.55)),
+                        Text(
+                          _scoreMessage(result.percentage),
+                          style: const TextStyle(
+                              fontFamily: 'Syne',
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.cocoaDeep,
+                              letterSpacing: -0.55),
+                        ),
                         const SizedBox(height: 3),
-                        const Text('Organic Chemistry · 10 Questions',
-                            style: TextStyle(
-                                fontFamily: 'DM Sans',
-                                fontSize: 13,
-                                color: AppColors.muted,
-                                fontWeight: FontWeight.w300)),
+                        Text(
+                          '${result.total} Questions',
+                          style: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 13,
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w300),
+                        ),
                       ]),
                     ),
 
@@ -120,11 +122,17 @@ class QuizResultScreen extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(26, 12, 26, 0),
                       child: Row(children: [
-                        _StatTile(value: '8', label: 'Correct', color: const Color(0xFF4A6128)),
+                        _StatTile(
+                            value: '${result.score}',
+                            label: 'Correct',
+                            color: const Color(0xFF4A6128)),
                         const SizedBox(width: 8),
-                        _StatTile(value: '2', label: 'Incorrect', color: const Color(0xFF9C2A1E)),
+                        _StatTile(
+                            value: '${result.total - result.score}',
+                            label: 'Incorrect',
+                            color: const Color(0xFF9C2A1E)),
                         const SizedBox(width: 8),
-                        const _StatTile(value: '4m', label: 'Time'),
+                        _StatTile(value: '${result.total}', label: 'Total'),
                       ]),
                     ),
 
@@ -149,36 +157,50 @@ class QuizResultScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Column(
-                              children: _breakdown.asMap().entries.map((e) {
+                              children: result.results.asMap().entries.map((e) {
                                 final i = e.key;
                                 final item = e.value;
-                                final isLast = i == _breakdown.length - 1;
+                                final isLast = i == result.results.length - 1;
                                 return Column(children: [
+                                  // Question row
                                   Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                                    child: Row(children: [
-                                      SizedBox(
-                                        width: 20,
-                                        child: Text(item.$1,
-                                            style: const TextStyle(
-                                                fontFamily: 'DM Sans',
-                                                fontSize: 11,
-                                                color: AppColors.muted)),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(item.$2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                                fontFamily: 'DM Sans',
-                                                fontSize: 12,
-                                                color: AppColors.cocoaDeep)),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      _ResultBadge(correct: item.$3),
-                                    ]),
+                                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                                    child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Q${i + 1}',
+                                              style: const TextStyle(
+                                                  fontFamily: 'DM Sans',
+                                                  fontSize: 11,
+                                                  color: AppColors.muted)),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(item.question,
+                                                style: const TextStyle(
+                                                    fontFamily: 'DM Sans',
+                                                    fontSize: 12,
+                                                    color: AppColors.cocoaDeep)),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          _ResultBadge(correct: item.isCorrect),
+                                        ]),
                                   ),
+                                  // Explanation row
+                                  if (item.explanation.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                                      child: Row(children: [
+                                        const SizedBox(width: 32),
+                                        Expanded(
+                                          child: Text(item.explanation,
+                                              style: const TextStyle(
+                                                  fontFamily: 'DM Sans',
+                                                  fontSize: 11,
+                                                  color: AppColors.muted,
+                                                  height: 1.4)),
+                                        ),
+                                      ]),
+                                    ),
                                   if (!isLast)
                                     Divider(
                                         height: 1, color: const Color(0xFFB48C50).withOpacity(0.1)),
@@ -190,50 +212,50 @@ class QuizResultScreen extends StatelessWidget {
                       ),
                     ),
 
-                    // ── AI insight
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
-                      child: Container(
-                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.52),
-                          border: Border(
-                            top: BorderSide(color: AppColors.gold.withOpacity(0.18)),
-                            right: BorderSide(color: AppColors.gold.withOpacity(0.18)),
-                            bottom: BorderSide(color: AppColors.gold.withOpacity(0.18)),
-                            left: BorderSide(color: AppColors.gold.withOpacity(0.5), width: 3),
-                          ),
-                          borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(14),
-                            bottomRight: Radius.circular(14),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('✦', style: TextStyle(fontSize: 15)),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text.rich(TextSpan(
-                                text: 'Focus area: ',
-                                style: TextStyle(
-                                    fontFamily: 'DM Sans',
-                                    fontSize: 12,
-                                    color: Color(0xFF6B4C3B),
-                                    fontWeight: FontWeight.w600),
-                                children: [
-                                  TextSpan(
-                                    text:
-                                        "Review Markovnikov's rule and Electrophilic Addition. AI audio explanation available.",
-                                    style: TextStyle(fontWeight: FontWeight.w300),
-                                  ),
-                                ],
-                              )),
+                    // ── AI insight — weak areas
+                    if (_weakAreas(result).isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.52),
+                            border: Border(
+                              top: BorderSide(color: AppColors.gold.withOpacity(0.18)),
+                              right: BorderSide(color: AppColors.gold.withOpacity(0.18)),
+                              bottom: BorderSide(color: AppColors.gold.withOpacity(0.18)),
+                              left: BorderSide(color: AppColors.gold.withOpacity(0.5), width: 3),
                             ),
-                          ],
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(14),
+                              bottomRight: Radius.circular(14),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('✦', style: TextStyle(fontSize: 15)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text.rich(TextSpan(
+                                  text: 'Focus area: ',
+                                  style: const TextStyle(
+                                      fontFamily: 'DM Sans',
+                                      fontSize: 12,
+                                      color: Color(0xFF6B4C3B),
+                                      fontWeight: FontWeight.w600),
+                                  children: [
+                                    TextSpan(
+                                      text: _weakAreas(result),
+                                      style: const TextStyle(fontWeight: FontWeight.w300),
+                                    ),
+                                  ],
+                                )),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
 
                     // ── CTAs
                     Padding(
@@ -241,7 +263,11 @@ class QuizResultScreen extends StatelessWidget {
                       child: Row(children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => Navigator.pushReplacementNamed(context, '/quiz'),
+                            onTap: () => Navigator.pushReplacementNamed(
+                              context,
+                              '/quiz',
+                              arguments: {'filename': filename},
+                            ),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 13),
                               decoration: BoxDecoration(
@@ -280,9 +306,29 @@ class QuizResultScreen extends StatelessWidget {
       ),
     );
   }
+
+  String _scoreMessage(double pct) {
+    if (pct >= 0.9) return 'Excellent work! 🎉';
+    if (pct >= 0.7) return 'Good work! Keep it up';
+    if (pct >= 0.5) return 'Not bad, keep studying';
+    return 'Keep practicing!';
+  }
+
+  String _weakAreas(QuizSubmitResponse r) {
+    final wrong = r.results.where((e) => !e.isCorrect).toList();
+    if (wrong.isEmpty) return '';
+    final topics = wrong
+        .map((e) {
+          final q = e.question;
+          return q.length > 40 ? '${q.substring(0, 40)}…' : q;
+        })
+        .take(2)
+        .join(' · ');
+    return 'Review: $topics';
+  }
 }
 
-// ─── Score ring painter ────────────────────────────────────────
+// ── Score ring ─────────────────────────────────────────────────
 class _ScoreRingPainter extends CustomPainter {
   final double pct;
   const _ScoreRingPainter(this.pct);
@@ -315,7 +361,7 @@ class _ScoreRingPainter extends CustomPainter {
   bool shouldRepaint(_) => false;
 }
 
-// ─── Stat tile ─────────────────────────────────────────────────
+// ── Stat tile ──────────────────────────────────────────────────
 class _StatTile extends StatelessWidget {
   final String value, label;
   final Color? color;
@@ -351,7 +397,7 @@ class _StatTile extends StatelessWidget {
       );
 }
 
-// ─── Result badge ──────────────────────────────────────────────
+// ── Result badge ───────────────────────────────────────────────
 class _ResultBadge extends StatelessWidget {
   final bool correct;
   const _ResultBadge({required this.correct});

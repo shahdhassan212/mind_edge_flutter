@@ -1,322 +1,547 @@
-// ============================================================
-// Page 18 — Quiz Question View
-// ============================================================
+// screens/quiz_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../features/analysis/model/quiz_models.dart';
+import '../features/analysis/providers/quiz_providers.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/animation_helpers.dart';
 import '../widgets/common_widgets.dart';
 
-class QuizScreen extends StatefulWidget {
-  const QuizScreen({super.key});
+class QuizScreen extends ConsumerStatefulWidget {
+  final String filename;
+  final int numQuestions;
+
+  const QuizScreen({
+    super.key,
+    required this.filename,
+    this.numQuestions = 10,
+  });
+
   @override
-  State<QuizScreen> createState() => _QuizScreenState();
+  ConsumerState<QuizScreen> createState() => _QuizScreenState();
 }
 
-class _QuizScreenState extends State<QuizScreen> {
-  int _selected = -1; // -1 = none
-  int _question = 3;
-  static const _total = 10;
+class _QuizScreenState extends ConsumerState<QuizScreen> {
+  int _currentIndex = 0;
 
-  static const _options = [
-    'SN2 — Bimolecular nucleophilic substitution',
-    'SN1 — Unimolecular nucleophilic substitution',
-    'E2 — Bimolecular elimination',
-    'E1cb — Carbanion mechanism',
-  ];
+  // answers[i] = selected option text (mcq) or typed text (text)
+  List<String> _answers = [];
+
+  final Map<int, TextEditingController> _textControllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(quizViewModelProvider(widget.filename).notifier).generateQuiz(
+            filename: widget.filename,
+            numQuestions: widget.numQuestions,
+          );
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final c in _textControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _controllerFor(int index) {
+    return _textControllers.putIfAbsent(index, () => TextEditingController());
+  }
+
+  void _initAnswers(int count) {
+    if (_answers.length != count) {
+      _answers = List.filled(count, '');
+    }
+  }
+
+  void _goNext(List<QuizQuestion> questions) {
+    // Sync text answer before moving
+    final q = questions[_currentIndex];
+    if (q.type == QuizQuestionType.text) {
+      _answers[_currentIndex] = _controllerFor(_currentIndex).text.trim();
+    }
+
+    if (_currentIndex < questions.length - 1) {
+      setState(() => _currentIndex++);
+    } else {
+      _submit();
+    }
+  }
+
+  void _goPrev() {
+    if (_currentIndex > 0) setState(() => _currentIndex--);
+  }
+
+  Future<void> _submit() async {
+    await ref.read(quizViewModelProvider(widget.filename).notifier).submitQuiz(answers: _answers);
+
+    final result = ref.read(quizViewModelProvider(widget.filename)).resultData;
+    if (!mounted) return;
+
+    Navigator.pushReplacementNamed(
+      context,
+      '/quiz-result',
+      arguments: {
+        'result': result,
+        'filename': widget.filename,
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(quizViewModelProvider(widget.filename));
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAF4E8),
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
-            gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: [0.0, 0.5, 1.0],
-                colors: [Color(0xFFFDFAF4), Color(0xFFF4E8D6), Color(0xFFECDAC0)])),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.0, 0.5, 1.0],
+            colors: [Color(0xFFFDFAF4), Color(0xFFF4E8D6), Color(0xFFECDAC0)],
+          ),
+        ),
         child: Stack(children: [
           Positioned(
-              top: -60,
-              right: -60,
-              child: Container(
-                  width: 220,
-                  height: 220,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                          colors: [AppColors.gold.withOpacity(0.12), Colors.transparent],
-                          radius: 0.68)))),
+            top: -60,
+            right: -60,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [AppColors.gold.withOpacity(0.12), Colors.transparent],
+                  radius: 0.68,
+                ),
+              ),
+            ),
+          ),
           SafeArea(
-              child: Column(children: [
-            // Nav
-            Padding(
-              padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
-              child: Row(children: [
-                Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.55),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.16)),
-                        boxShadow: AppShadows.sm),
-                    child: GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: const Center(
-                            child: Text('✕',
-                                style: TextStyle(fontSize: 14, color: AppColors.cocoa))))),
-                const Spacer(),
-                const Text('Quiz · Organic Chemistry',
-                    style: TextStyle(
-                        fontFamily: 'Syne',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.cocoaDeep)),
-                const Spacer(),
-                Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.55),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.16)),
-                        boxShadow: AppShadows.sm),
-                    child: const Center(
-                        child: Text('⋯', style: TextStyle(fontSize: 13, color: AppColors.cocoa)))),
-              ]),
-            ),
-
-            // Progress bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(26, 14, 26, 0),
-              child: Stack(children: [
-                Container(
-                    height: 3,
-                    decoration: BoxDecoration(
-                        color: AppColors.cocoa.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(2))),
-                FractionallySizedBox(
-                    widthFactor: _question / _total,
-                    child: ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: Stack(children: [
-                          Container(
-                              height: 3,
-                              decoration: const BoxDecoration(gradient: AppGradients.progress)),
-                          ShimmerOverlay(duration: const Duration(milliseconds: 2000)),
-                        ]))),
-              ]),
-            ),
-            Padding(
-                padding: const EdgeInsets.fromLTRB(26, 5, 26, 0),
-                child: Text('Question $_question of $_total · ${_total - _question} remaining',
-                    style: const TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 11,
-                        color: AppColors.muted,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.06 * 11))),
-
-            Expanded(
-                child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(children: [
-                // Question card
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-                    decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.62),
-                        border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.15)),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: AppShadows.md),
-                    child: Stack(children: [
-                      Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                              child: Container(
-                                  height: 3,
-                                  decoration:
-                                      const BoxDecoration(gradient: AppGradients.progress)))),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('MULTIPLE CHOICE · CHAPTER 9',
-                              style: TextStyle(
-                                  fontFamily: 'DM Sans',
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.14 * 9.5,
-                                  color: AppColors.muted)),
-                          const SizedBox(height: 8),
-                          const Text(
-                              'Which mechanism proceeds through a carbocation intermediate and follows first-order kinetics?',
-                              style: TextStyle(
-                                  fontFamily: 'Syne',
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.cocoaDeep,
-                                  letterSpacing: -0.01 * 15,
-                                  height: 1.4)),
-                          const SizedBox(height: 10),
-                          Row(children: [
-                            const Text('📄 ', style: TextStyle(fontSize: 12)),
-                            const Text('From: Organic Chemistry Notes — Ch.9.pdf',
-                                style: TextStyle(
-                                    fontFamily: 'DM Sans',
-                                    fontSize: 10.5,
-                                    color: AppColors.muted,
-                                    fontWeight: FontWeight.w300)),
-                          ]),
-                        ]),
-                      ),
-                    ]),
-                  ),
-                ),
-
-                // Options
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
-                  child: Column(
-                      children: List.generate(4, (i) {
-                    final letters = ['A', 'B', 'C', 'D'];
-                    final sel = _selected == i;
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: i < 3 ? 8 : 0),
-                      child: GestureDetector(
-                        onTap: () => setState(() => _selected = i),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                          decoration: BoxDecoration(
-                              color: sel
-                                  ? AppColors.cocoa.withOpacity(0.06)
-                                  : Colors.white.withOpacity(0.6),
-                              border: Border.all(
-                                  color: sel
-                                      ? AppColors.cocoa
-                                      : const Color(0xFFB48C50).withOpacity(0.14),
-                                  width: 1.5),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: sel
-                                  ? [
-                                      BoxShadow(
-                                          color: AppColors.cocoa.withOpacity(0.09),
-                                          blurRadius: 0,
-                                          spreadRadius: 3),
-                                      ...AppShadows.sm
-                                    ]
-                                  : AppShadows.sm),
-                          child: Row(children: [
-                            AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 26,
-                                height: 26,
-                                decoration: BoxDecoration(
-                                    gradient: sel ? AppGradients.ctaButton : null,
-                                    color: sel ? null : AppColors.cocoa.withOpacity(0.08),
-                                    border: Border.all(
-                                        color: sel
-                                            ? Colors.transparent
-                                            : AppColors.cocoa.withOpacity(0.18)),
-                                    borderRadius: BorderRadius.circular(8)),
-                                child: Center(
-                                    child: Text(letters[i],
-                                        style: TextStyle(
-                                            fontFamily: 'Syne',
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                            color: sel ? AppColors.white : AppColors.cocoa)))),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: Text(_options[i],
-                                    style: const TextStyle(
-                                        fontFamily: 'DM Sans',
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w400,
-                                        color: AppColors.cocoaDeep,
-                                        height: 1.4))),
-                          ]),
-                        ),
-                      ),
-                    );
-                  })),
-                ),
-              ]),
-            )),
-
-            // Bottom nav
-            Padding(
-              padding: const EdgeInsets.fromLTRB(26, 14, 26, 20),
-              child: Row(children: [
-                GestureDetector(
-                    onTap: () => setState(() {
-                          if (_question > 1) _question--;
-                        }),
-                    child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
-                        decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.62),
-                            border: Border.all(
-                                color: const Color(0xFFB48C50).withOpacity(0.18), width: 1.5),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: AppShadows.sm),
-                        child: const Text('← Prev',
-                            style: TextStyle(
-                                fontFamily: 'DM Sans',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.cocoa)))),
-                const Spacer(),
-                // Dots
-                Row(
-                    children: List.generate(5, (i) {
-                  final active = i == 2;
-                  return Padding(
-                      padding: EdgeInsets.only(right: i < 4 ? 5 : 0),
-                      child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: active ? 14 : 5,
-                          height: 5,
-                          decoration: BoxDecoration(
-                              color: active
-                                  ? AppColors.gold
-                                  : AppColors.cocoa.withOpacity(i < 2 ? 1 : 0.18),
-                              borderRadius: BorderRadius.circular(active ? 3 : 100))));
-                })),
-                const Spacer(),
-                GestureDetector(
-                    onTap: () {
-                      if (_question < _total) {
-                        setState(() => _question++);
-                      } else {
-                        Navigator.pushNamed(context, '/quiz-result');
-                      }
-                    },
-                    child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
-                        decoration: BoxDecoration(
-                            gradient: AppGradients.ctaButton,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: AppShadows.btn),
-                        child: const Text('Next →',
-                            style: TextStyle(
-                                fontFamily: 'DM Sans',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.white)))),
-              ]),
-            ),
-          ])),
+            child: switch (state.generateStatus) {
+              QuizLoadStatus.idle || QuizLoadStatus.loading => _buildLoading(),
+              QuizLoadStatus.failure => _buildError(state.error),
+              QuizLoadStatus.success => _buildQuiz(state),
+            },
+          ),
         ]),
       ),
     );
   }
+
+  // ── Loading ───────────────────────────────────────────────────
+  Widget _buildLoading() {
+    return const Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        CircularProgressIndicator(color: AppColors.gold),
+        SizedBox(height: 16),
+        Text('Generating your quiz…',
+            style: TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppColors.muted)),
+      ]),
+    );
+  }
+
+  // ── Error ─────────────────────────────────────────────────────
+  Widget _buildError(String? msg) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('⚠️', style: TextStyle(fontSize: 40)),
+          const SizedBox(height: 12),
+          Text(msg ?? 'Failed to generate quiz',
+              textAlign: TextAlign.center,
+              style:
+                  const TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppColors.cocoaDeep)),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () => ref
+                .read(quizViewModelProvider(widget.filename).notifier)
+                .generateQuiz(filename: widget.filename, numQuestions: widget.numQuestions),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: AppGradients.ctaButton,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Text('Retry',
+                  style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.white)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  // ── Quiz body ─────────────────────────────────────────────────
+  Widget _buildQuiz(QuizState state) {
+    final questions = state.quizData!.questions;
+    final total = questions.length;
+
+    // lazy init answers list
+    _initAnswers(total);
+
+    final q = questions[_currentIndex];
+    final questionNumber = _currentIndex + 1;
+    final isLast = _currentIndex == total - 1;
+
+    return Column(children: [
+      // ── Nav bar
+      Padding(
+        padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
+        child: Row(children: [
+          _NavBtn(
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: const Center(
+                child: Text('✕', style: TextStyle(fontSize: 14, color: AppColors.cocoa)),
+              ),
+            ),
+          ),
+          const Spacer(),
+          const Text('Quiz',
+              style: TextStyle(
+                  fontFamily: 'Syne',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.cocoaDeep)),
+          const Spacer(),
+          _NavBtn(
+            child: const Center(
+              child: Text('⋯', style: TextStyle(fontSize: 13, color: AppColors.cocoa)),
+            ),
+          ),
+        ]),
+      ),
+
+      // ── Progress bar
+      Padding(
+        padding: const EdgeInsets.fromLTRB(26, 14, 26, 0),
+        child: Stack(children: [
+          Container(
+            height: 3,
+            decoration: BoxDecoration(
+              color: AppColors.cocoa.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          FractionallySizedBox(
+            widthFactor: questionNumber / total,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: Stack(children: [
+                Container(
+                  height: 3,
+                  decoration: const BoxDecoration(gradient: AppGradients.progress),
+                ),
+                ShimmerOverlay(duration: const Duration(milliseconds: 2000)),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(26, 5, 26, 0),
+        child: Text(
+          'Question $questionNumber of $total · ${total - questionNumber} remaining',
+          style: const TextStyle(
+              fontFamily: 'DM Sans',
+              fontSize: 11,
+              color: AppColors.muted,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.66),
+        ),
+      ),
+
+      // ── Scrollable content
+      Expanded(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Column(children: [
+            // Question card
+            Padding(
+              padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.62),
+                  border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.15)),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: AppShadows.md,
+                ),
+                child: Stack(children: [
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      child: Container(
+                        height: 3,
+                        decoration: const BoxDecoration(gradient: AppGradients.progress),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        Text(
+                          q.type == QuizQuestionType.mcq ? 'MULTIPLE CHOICE' : 'WRITTEN ANSWER',
+                          style: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.33,
+                              color: AppColors.muted),
+                        ),
+                      ]),
+                      const SizedBox(height: 8),
+                      Text(
+                        q.question,
+                        style: const TextStyle(
+                            fontFamily: 'Syne',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.cocoaDeep,
+                            letterSpacing: -0.15,
+                            height: 1.4),
+                      ),
+                    ]),
+                  ),
+                ]),
+              ),
+            ),
+
+            // Answer area
+            Padding(
+              padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
+              child: q.type == QuizQuestionType.mcq
+                  ? _buildMcqOptions(q, _currentIndex)
+                  : _buildTextAnswer(_currentIndex),
+            ),
+          ]),
+        ),
+      ),
+
+      // ── Bottom nav
+      Padding(
+        padding: const EdgeInsets.fromLTRB(26, 14, 26, 20),
+        child: Row(children: [
+          GestureDetector(
+            onTap: _goPrev,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.62),
+                border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.18), width: 1.5),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppShadows.sm,
+              ),
+              child: Text(
+                '← Prev',
+                style: TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _currentIndex == 0 ? AppColors.muted : AppColors.cocoa),
+              ),
+            ),
+          ),
+          const Spacer(),
+          // Dot indicators (max 5 visible)
+          _buildDots(total),
+          const Spacer(),
+          GestureDetector(
+            onTap: state.submitStatus == QuizLoadStatus.loading ? null : () => _goNext(questions),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+              decoration: BoxDecoration(
+                gradient: AppGradients.ctaButton,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppShadows.btn,
+              ),
+              child: state.submitStatus == QuizLoadStatus.loading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      isLast ? 'Submit →' : 'Next →',
+                      style: const TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.white),
+                    ),
+            ),
+          ),
+        ]),
+      ),
+    ]);
+  }
+
+  // ── MCQ options ───────────────────────────────────────────────
+  Widget _buildMcqOptions(QuizQuestion q, int questionIndex) {
+    final options = q.options ?? [];
+    return Column(
+      children: options.asMap().entries.map((e) {
+        final i = e.key;
+        final option = e.value;
+
+        // Strip leading "A) " / "B) " etc. for the label letter
+        final letterMatch = RegExp(r'^([A-D])\)').firstMatch(option);
+        final letter = letterMatch != null ? letterMatch.group(1)! : String.fromCharCode(65 + i);
+        final displayText = letterMatch != null ? option.substring(letterMatch.end).trim() : option;
+
+        final selected = _answers[questionIndex] == option;
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: i < options.length - 1 ? 8 : 0),
+          child: GestureDetector(
+            onTap: () => setState(() => _answers[questionIndex] = option),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.cocoa.withOpacity(0.06) : Colors.white.withOpacity(0.6),
+                border: Border.all(
+                  color: selected ? AppColors.cocoa : const Color(0xFFB48C50).withOpacity(0.14),
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                            color: AppColors.cocoa.withOpacity(0.09),
+                            blurRadius: 0,
+                            spreadRadius: 3),
+                        ...AppShadows.sm
+                      ]
+                    : AppShadows.sm,
+              ),
+              child: Row(children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    gradient: selected ? AppGradients.ctaButton : null,
+                    color: selected ? null : AppColors.cocoa.withOpacity(0.08),
+                    border: Border.all(
+                      color: selected ? Colors.transparent : AppColors.cocoa.withOpacity(0.18),
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text(letter,
+                        style: TextStyle(
+                            fontFamily: 'Syne',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: selected ? AppColors.white : AppColors.cocoa)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(displayText,
+                      style: const TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: AppColors.cocoaDeep,
+                          height: 1.4)),
+                ),
+              ]),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // ── Text answer ───────────────────────────────────────────────
+  Widget _buildTextAnswer(int questionIndex) {
+    final controller = _controllerFor(questionIndex);
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.62),
+        border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.18), width: 1.5),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppShadows.sm,
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: 6,
+        minLines: 4,
+        style: const TextStyle(
+            fontFamily: 'DM Sans', fontSize: 13, color: AppColors.cocoaDeep, height: 1.5),
+        decoration: InputDecoration(
+          hintText: 'Write your answer here…',
+          hintStyle: TextStyle(
+              fontFamily: 'DM Sans', fontSize: 13, color: AppColors.muted.withOpacity(0.6)),
+          contentPadding: const EdgeInsets.all(14),
+          border: InputBorder.none,
+        ),
+        onChanged: (v) => _answers[questionIndex] = v,
+      ),
+    );
+  }
+
+  // ── Dot indicators ────────────────────────────────────────────
+  Widget _buildDots(int total) {
+    const maxDots = 5;
+    final count = total.clamp(0, maxDots);
+    return Row(
+      children: List.generate(count, (i) {
+        final active = i == _currentIndex.clamp(0, count - 1);
+        return Padding(
+          padding: EdgeInsets.only(right: i < count - 1 ? 5 : 0),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: active ? 14 : 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: active
+                  ? AppColors.gold
+                  : AppColors.cocoa.withOpacity(i < _currentIndex ? 1 : 0.18),
+              borderRadius: BorderRadius.circular(active ? 3 : 100),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+// ── Small reusable nav button ──────────────────────────────────
+class _NavBtn extends StatelessWidget {
+  final Widget child;
+  const _NavBtn({required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.55),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.16)),
+          boxShadow: AppShadows.sm,
+        ),
+        child: child,
+      );
 }

@@ -23,6 +23,7 @@ import '../screens/settings_screen.dart';
 import '../screens/library_screen.dart';
 import '../screens/ai_analysis_screen.dart';
 import '../screens/ai_chat_screen.dart'; // ← NEW
+import '../features/analysis/model/quiz_models.dart';
 
 class AppRouter {
   static const String initialRoute = '/';
@@ -123,10 +124,18 @@ class AppRouter {
         page = const AiResultScreen();
         break;
       case '/quiz':
-        page = const QuizScreen();
+        final args = s.arguments as Map<String, dynamic>? ?? {};
+        page = QuizScreen(
+          filename: args['filename'] as String? ?? '',
+          numQuestions: args['numQuestions'] as int? ?? 10,
+        );
         break;
       case '/quiz-result':
-        page = const QuizResultScreen();
+        final args = s.arguments as Map<String, dynamic>? ?? {};
+        page = QuizResultScreen(
+          result: args['result'] as QuizSubmitResponse,
+          filename: args['filename'] as String? ?? '',
+        );
         break;
 
       default:

@@ -44,16 +44,16 @@ class AnalysisRepository {
     return VisualAnalysisModel.fromJson(_asJsonMap(resp.data));
   }
 
-  // ── POST /api/Document/process-audio ─────────────────────
+  // ── POST /api/Document/summary ─────────────────────
   Future<AudioSummaryModel> processAudio(
     String fileName, {
     bool tts = true,
   }) async {
     final resp = await _dio.post(
-      '/api/Document/process-audio',
+      '/api/Document/summary', // تم تغيير المسار من process-audio إلى summary
       queryParameters: {'fileName': fileName, 'tts': tts},
       options: Options(
-        headers: {'accept': 'application/json'},
+        headers: {'accept': '*/*'},
         responseType: ResponseType.json,
       ),
     );
