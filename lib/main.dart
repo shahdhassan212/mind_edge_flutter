@@ -12,7 +12,7 @@ void main() async {
   await Hive.openBox<String>(kFoldersBoxName);
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
+    DeviceOrientation.portraitDown, 
   ]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,

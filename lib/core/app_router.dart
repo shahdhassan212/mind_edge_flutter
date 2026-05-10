@@ -105,6 +105,7 @@ class AppRouter {
         final args = s.arguments as Map<String, dynamic>? ?? {};
         page = AIChatScreen(
           fileName: args['fileName'] as String? ?? '',
+          sessionId: args['sessionId'] as String?,
         );
         break;
 

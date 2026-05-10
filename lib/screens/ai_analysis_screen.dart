@@ -203,6 +203,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
           child: AiAskStrip(
             onTap: () => Navigator.pushNamed(context, '/ai-chat', arguments: {
               'fileName': widget.displayName ?? _fileName ?? '',
+              'sessionId': state.visualData?.sessionId,
             }),
           ),
         ),
@@ -350,7 +351,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
       child: Row(children: [
         Expanded(
           child: GestureDetector(
-            onTap: () => Navigator.pushNamed(context, '/quiz_screen'),
+            onTap: () => Navigator.pushNamed(context, '/quiz'),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 13),
               decoration: BoxDecoration(
