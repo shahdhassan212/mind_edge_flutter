@@ -1,57 +1,14 @@
-// ============================================================
-// Page 17 — Audio Explanation Player
-// • Receives audioUrl + summary + displayName via route arguments
-//   (sent from ai_analysis_screen after /api/Document/process-audio)
-// • just_audio for real playback
-
-
+// screens/audio_screen.dart
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import '../theme/design_tokens.dart';
+import '../widgets/common_widgets.dart';
 
-// ─────────────────────────────────────────────────────────────
-// COLORS
-// ─────────────────────────────────────────────────────────────
-class _C {
-  // Background — matches dashboard warm cream gradient
-  static const bg1 = Color(0xFFF7EDD8);
-  static const bg2 = Color(0xFFF0E0C0);
-  static const bg3 = Color(0xFFE8D0A8);
-  static const cardDark = Color(0xFF3D2510);
-  static const cardDark2 = Color(0xFF2A1A0E);
-  static const white = Colors.white;
-  // Gold — matches dashboard goldDark / goldLight exactly
-  static const gold = Color(0xFFC9943A);
-  static const goldLight = Color(0xFFE8B84B);
-  // Primary text — dashboard textDark (high contrast on cream)
-  static const cocoa = Color(0xFF2A1A0E);
-  static const cocoaDeep = Color(0xFF2A1A0E);
-  // Muted text — dashboard textMuted
-  static const muted = Color(0xFF9E8A72);
-  // Body text — dashboard textDark (strong contrast)
-  static const textBody = Color(0xFF2A1A0E);
-  static const cardBg = Color(0xFFFEFCF7);
-  // Border — matches dashboard statBorder
-  static const border = Color(0xFFE8D9C0);
-  // Waveform played — dark espresso for high contrast
-  static const wfPlayed1 = Color(0xFF2A1A0E);
-  static const wfPlayed2 = Color(0xFFC9943A);
-  static const wfUnplayed = Color(0xFFD6C4A8);
-  // Scrubber — matches dashboard progress bar approach
-  static const scrubTrack = Color(0xFFE8D9C0);
-  static const scrubFill1 = Color(0xFF2A1A0E);
-  static const scrubFill2 = Color(0xFFC9943A);
-}
-
-// ─────────────────────────────────────────────────────────────
-// MODEL
-// ─────────────────────────────────────────────────────────────
 class AudioLesson {
-  final String audioUrl;     // absolute URL to the MP3
-  final String summary;      // transcript — what the audio reads
-  final String displayName;  // file name shown as the card title
-
+  final String audioUrl;
+  final String summary;
+  final String displayName;
   const AudioLesson({
     required this.audioUrl,
     required this.summary,
@@ -59,43 +16,35 @@ class AudioLesson {
   });
 }
 
-// Backend serves audio under this host; the API returns a relative path
-// like "/audio/<hash>.mp3", which we join with this base.
 const _kAudioBaseUrl = 'https://midedge.runasp.net';
 
-// ─────────────────────────────────────────────────────────────
-// SCREEN
-// ─────────────────────────────────────────────────────────────
 class AudioScreen extends StatefulWidget {
   const AudioScreen({super.key});
+
   @override
   State<AudioScreen> createState() => _AudioScreenState();
 }
 
 class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStateMixin {
-  // ── State ─────────────────────────────────────────────────
   AudioLesson? _lesson;
   bool _loading = true;
   String? _error;
 
   final _player = AudioPlayer();
-
   bool _captions = true;
-  int _speedIdx = 1; // 0=1× 1=1.5× 2=2×
+  int _speedIdx = 1;
   static const _speeds = [1.0, 1.5, 2.0];
 
-  // Playback driven by just_audio streams
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   bool _playing = false;
 
-  // Waveform animation controller for active bar
-  late AnimationController _wfCtrl;
+  late final AnimationController _wfCtrl;
+  late final List<StreamSubscription> _subs;
 
-  // Waveform bar heights
-  static const _wfPlayed = [14.0, 24.0, 32.0, 18.0, 28.0, 12.0];
-  static const _wfActive = 36.0;
-  static const _wfUnplayed = [
+  static const _wfPlayedH = [14.0, 24.0, 32.0, 18.0, 28.0, 12.0];
+  static const _wfActiveH = 36.0;
+  static const _wfUnplayedH = [
     20.0,
     30.0,
     16.0,
@@ -108,12 +57,9 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
     34.0,
     14.0,
     28.0,
-    12.0
+    12.0,
   ];
 
-  late final List<StreamSubscription> _subs;
-
-  // ── Init ──────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -142,44 +88,23 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
   Future<void> _loadLesson() async {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is! Map) {
-      if (mounted) {
-        setState(() {
-          _error = 'No audio data was provided.';
-          _loading = false;
-        });
-      }
-      return;
+      return _fail('No audio data was provided.');
     }
     final rawUrl = args['audioUrl']?.toString() ?? '';
     final summary = args['summary']?.toString() ?? '';
     final displayName = args['displayName']?.toString() ?? '';
-    if (rawUrl.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _error = 'Audio URL is missing.';
-          _loading = false;
-        });
-      }
-      return;
-    }
+    if (rawUrl.isEmpty) return _fail('Audio URL is missing.');
 
-    final audioUrl =
-        rawUrl.startsWith('http') ? rawUrl : '$_kAudioBaseUrl$rawUrl';
-
-    final lesson = AudioLesson(
-      audioUrl: audioUrl,
-      summary: summary,
-      displayName: displayName,
-    );
+    final url = rawUrl.startsWith('http') ? rawUrl : '$_kAudioBaseUrl$rawUrl';
 
     if (!mounted) return;
     setState(() {
-      _lesson = lesson;
+      _lesson = AudioLesson(audioUrl: url, summary: summary, displayName: displayName);
       _loading = false;
     });
 
     try {
-      await _player.setUrl(audioUrl);
+      await _player.setUrl(url);
       await _player.setSpeed(_speeds[_speedIdx]);
       await _player.play();
     } catch (e) {
@@ -187,38 +112,39 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
     }
   }
 
-  // ── Dispose ───────────────────────────────────────────────
+  void _fail(String msg) {
+    if (mounted)
+      setState(() {
+        _error = msg;
+        _loading = false;
+      });
+  }
+
   @override
   void dispose() {
     _wfCtrl.dispose();
-    for (final s in _subs) {
-      s.cancel();
-    }
+    for (final s in _subs) s.cancel();
     _player.dispose();
     super.dispose();
   }
 
-  // ── Helpers ───────────────────────────────────────────────
   String _fmt(Duration d) => '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
 
   double get _progress => _duration.inMilliseconds == 0
       ? 0
       : (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0);
 
-  Future<void> _seek(double factor) async {
-    final ms = (factor * _duration.inMilliseconds).round();
+  Future<void> _seek(double factor) =>
+      _player.seek(Duration(milliseconds: (factor * _duration.inMilliseconds).round()));
+
+  Future<void> _skip(Duration delta) async {
+    final ms = (_position + delta).inMilliseconds.clamp(0, _duration.inMilliseconds);
     await _player.seek(Duration(milliseconds: ms));
   }
 
-  Future<void> _skip(Duration delta) async {
-    final target = _position + delta;
-    await _player
-        .seek(Duration(milliseconds: target.inMilliseconds.clamp(0, _duration.inMilliseconds)));
-  }
-
-  Future<void> _setSpeed(int idx) async {
-    setState(() => _speedIdx = idx);
-    await _player.setSpeed(_speeds[idx]);
+  Future<void> _setSpeed(int i) async {
+    setState(() => _speedIdx = i);
+    await _player.setSpeed(_speeds[i]);
   }
 
   @override
@@ -228,7 +154,6 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
     final lesson = _lesson!;
 
     return Scaffold(
-      backgroundColor: _C.bg1,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -236,35 +161,18 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
             end: Alignment.bottomCenter,
             stops: [0.0, 0.55, 1.0],
             colors: [
-              Color(0xFFF7EDD8), // top — light cream (dashboard bgTop)
-              Color(0xFFF0E0C0), // mid — warm sand (dashboard mid)
-              Color(0xFFE8D0A8), // bottom — deeper tan (dashboard bgBottom)
+              AppColors.dashBgTop,
+              AppColors.dashBgMid,
+              AppColors.dashBgBottom,
             ],
           ),
         ),
         child: Stack(children: [
-          // 2. الدائرة الضوئية (Ambient circle) باللون الذهبي المعتمد
-          Positioned(
-            top: -60,
-            right: -60,
-            child: Container(
-              width: 240,
-              height: 240,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    _C.goldLight.withValues(alpha: 0.18), // matches dashboard ambient orb
-                    Colors.transparent,
-                  ],
-                  radius: 0.68,
-                ),
-              ),
-            ),
-          ),
+          AppDecorOrb(
+              top: -60, right: -60, size: 240, color: AppColors.dashGoldLight.withOpacity(0.18)),
           SafeArea(
             child: Column(children: [
-              _buildNav(), // تأكدي إن أيقونة الرجوع لونها بني 0xFF7C5642
+              _buildNav(),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(bottom: 24),
@@ -283,77 +191,46 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
     );
   }
 
-  // ── Nav ───────────────────────────────────────────────────
   Widget _buildNav() => Padding(
         padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
         child: Row(children: [
-          // Back button
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: _C.white.withOpacity(0.75),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _C.border.withOpacity(0.5)),
-                boxShadow: [
-                  BoxShadow(
-                      color: _C.cocoaDeep.withOpacity(0.07),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2))
-                ],
-              ),
-              child: const Center(
-                child: Text('←', style: TextStyle(fontSize: 16, color: _C.cocoaDeep)),
-              ),
-            ),
-          ),
+          AppBackButton(onTap: () => Navigator.pop(context)),
           const Spacer(),
           const Text('Audio Explanation',
               style: TextStyle(
                   fontFamily: 'Syne',
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: _C.cocoaDeep)),
+                  color: AppColors.cocoaDeep)),
           const Spacer(),
-          // More button
           Container(
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: _C.white.withOpacity(0.55),
+              color: Colors.white.withOpacity(0.55),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _C.border.withOpacity(0.4)),
-              boxShadow: [BoxShadow(color: _C.cocoaDeep.withOpacity(0.06), blurRadius: 6)],
+              border: Border.all(color: AppColors.dashBorder.withOpacity(0.4)),
+              boxShadow: AppShadows.sm,
             ),
             child: const Center(
-              child: Text('⋯', style: TextStyle(fontSize: 13, color: _C.cocoa)),
+              child: Text('⋯', style: TextStyle(fontSize: 13, color: AppColors.cocoa)),
             ),
           ),
         ]),
       );
 
-  // ── Topic card ────────────────────────────────────────────
   Widget _buildTopicCard(AudioLesson lesson) => Padding(
         padding: const EdgeInsets.fromLTRB(26, 14, 26, 0),
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
           decoration: BoxDecoration(
-           
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFC9A96E), Color(0xFF7C5642)],
-            ),
+            gradient: AppGradients.ctaButtonFinal,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                // ظل بني ناعم متناسق مع المرجع
-                color: const Color(0xFF7C5642).withOpacity(0.25),
-                blurRadius: 36,
-                offset: const Offset(0, 12),
-              ),
+                  color: AppColors.cocoa.withOpacity(0.25),
+                  blurRadius: 36,
+                  offset: const Offset(0, 12)),
             ],
           ),
           child: Stack(children: [
@@ -363,33 +240,33 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
               child: Container(
                 width: 120,
                 height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.15),
-                ),
+                decoration:
+                    BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.15)),
               ),
             ),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('AUDIO EXPLANATION',
-                  style: TextStyle(
-                      fontFamily: 'DM Sans',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white.withOpacity(0.9),
-                      letterSpacing: 1.4)),
-              const SizedBox(height: 5),
-              Text(lesson.displayName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontFamily: 'Syne',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: -0.3,
-                      height: 1.25)),
-              const SizedBox(height: 4),
-              Text(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('AUDIO EXPLANATION',
+                    style: TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white.withOpacity(0.9),
+                        letterSpacing: 1.4)),
+                const SizedBox(height: 5),
+                Text(lesson.displayName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontFamily: 'Syne',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                        height: 1.25)),
+                const SizedBox(height: 4),
+                Text(
                   _duration > Duration.zero
                       ? 'Generated from your uploaded notes · ${_fmt(_duration)}'
                       : 'Generated from your uploaded notes',
@@ -397,160 +274,125 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
                       fontFamily: 'DM Sans',
                       fontSize: 12,
                       color: Colors.white.withOpacity(0.8),
-                      fontWeight: FontWeight.w400)),
-            ]),
-           Positioned(
-              right: 0,
-              bottom: 0,
-              child: _FloatingMiniBot(),
+                      fontWeight: FontWeight.w400),
+                ),
+              ],
             ),
+            Positioned(right: 0, bottom: 0, child: _FloatingMiniBot()),
           ]),
         ),
       );
 
-  // ── Speed pills + captions toggle ─────────────────────────
+  // ─── Speed + captions ──────────────────────────────────────
   Widget _buildControls() => Padding(
         padding: const EdgeInsets.fromLTRB(26, 12, 26, 0),
         child: Row(children: [
-          // Speed pills
           Row(
-              children: ['1×', '1.5×', '2×'].asMap().entries.map((e) {
-            final i = e.key;
-            final label = e.value;
-            final active = i == _speedIdx;
-            return GestureDetector(
-              onTap: () => _setSpeed(i),
-              child: Padding(
-                padding: EdgeInsets.only(right: i < 2 ? 5 : 0),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
-                  decoration: BoxDecoration(
-                    gradient: active
-                        ? const LinearGradient(colors: [Color(0xFF4A2C14), Color(0xFF2A1A0E)])
-                        : null,
-                    color: active ? null : _C.cocoa.withOpacity(0.08),
-                    border:
-                        Border.all(color: active ? Colors.transparent : _C.cocoa.withOpacity(0.16)),
-                    borderRadius: BorderRadius.circular(100),
-                    boxShadow: active
-                        ? [
-                            BoxShadow(
-                                color: _C.cocoaDeep.withOpacity(0.22),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3))
-                          ]
-                        : null,
+            children: ['1×', '1.5×', '2×'].asMap().entries.map((e) {
+              final active = e.key == _speedIdx;
+              return GestureDetector(
+                onTap: () => _setSpeed(e.key),
+                child: Padding(
+                  padding: EdgeInsets.only(right: e.key < 2 ? 5 : 0),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
+                    decoration: BoxDecoration(
+                      gradient: active
+                          ? const LinearGradient(
+                              colors: [Color(0xFF4A2C14), AppColors.audioCardDark2])
+                          : null,
+                      color: active ? null : AppColors.cocoa.withOpacity(0.08),
+                      border: Border.all(
+                          color: active ? Colors.transparent : AppColors.cocoa.withOpacity(0.16)),
+                      borderRadius: BorderRadius.circular(100),
+                      boxShadow: active
+                          ? [
+                              BoxShadow(
+                                  color: AppColors.cocoaDeep.withOpacity(0.22),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3))
+                            ]
+                          : null,
+                    ),
+                    child: Text(e.value,
+                        style: TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: active ? Colors.white : AppColors.cocoa)),
                   ),
-                  child: Text(label,
-                      style: TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: active ? _C.white : _C.cocoa)),
                 ),
-              ),
-            );
-          }).toList()),
+              );
+            }).toList(),
+          ),
           const Spacer(),
-          // Captions toggle
           GestureDetector(
             onTap: () => setState(() => _captions = !_captions),
             child: Row(children: [
-              _buildToggle(_captions),
+              _Toggle(on: _captions),
               const SizedBox(width: 7),
               const Text('Captions',
                   style: TextStyle(
                       fontFamily: 'DM Sans',
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: _C.cocoa)),
+                      color: AppColors.cocoa)),
             ]),
           ),
         ]),
       );
 
-  Widget _buildToggle(bool on) => AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 34,
-        height: 19,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(100),
-          gradient:
-              on ? const LinearGradient(colors: [Color(0xFF6B3A2A), Color(0xFFC9943A)]) : null,
-          color: on ? null : _C.cocoa.withOpacity(0.15),
-          boxShadow: on
-              ? [
-                  BoxShadow(
-                      color: _C.cocoa.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))
-                ]
-              : null,
-        ),
-        child: Align(
-          alignment: on ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.all(3),
-            width: 13,
-            height: 13,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: _C.white,
-              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
-            ),
-          ),
-        ),
-      );
-
-  // ── Live transcript ───────────────────────────────────────
+  // ─── Transcript ────────────────────────────────────────────
   Widget _buildTranscript(AudioLesson lesson) => Padding(
         padding: const EdgeInsets.fromLTRB(26, 12, 26, 0),
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           decoration: BoxDecoration(
-            color: _C.white.withOpacity(0.58),
-            border: Border.all(color: _C.border.withOpacity(0.35)),
+            color: Colors.white.withOpacity(0.58),
+            border: Border.all(color: AppColors.dashBorder.withOpacity(0.35)),
             borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                  color: _C.cocoaDeep.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))
+            boxShadow: AppShadows.sm,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('TRANSCRIPT',
+                  style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.4,
+                      color: AppColors.muted)),
+              const SizedBox(height: 8),
+              SelectableText(
+                lesson.summary.isNotEmpty ? lesson.summary : 'No transcript available.',
+                style: const TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                    color: AppColors.cocoaDeep,
+                    height: 1.65),
+              ),
             ],
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('TRANSCRIPT',
-                style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.4,
-                    color: _C.muted)),
-            const SizedBox(height: 8),
-            SelectableText(
-              lesson.summary.isNotEmpty
-                  ? lesson.summary
-                  : 'No transcript available.',
-              style: const TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  color: _C.textBody,
-                  height: 1.65),
-            ),
-          ]),
         ),
       );
 
-  // ── Player card ───────────────────────────────────────────
+  // ─── Player card ───────────────────────────────────────────
   Widget _buildPlayer() => Padding(
         padding: const EdgeInsets.fromLTRB(26, 12, 26, 0),
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
           decoration: BoxDecoration(
-            color: _C.white.withOpacity(0.62),
-            border: Border.all(color: _C.border.withOpacity(0.35)),
+            color: Colors.white.withOpacity(0.62),
+            border: Border.all(color: AppColors.dashBorder.withOpacity(0.35)),
             borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                  color: _C.cocoaDeep.withOpacity(0.07), blurRadius: 14, offset: const Offset(0, 4))
+                  color: AppColors.cocoaDeep.withOpacity(0.07),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4))
             ],
           ),
           child: Column(children: [
@@ -563,95 +405,83 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
         ),
       );
 
-  // ── Waveform ──────────────────────────────────────────────
+  // ─── Waveform ──────────────────────────────────────────────
   Widget _buildWaveform() => AnimatedBuilder(
         animation: _wfCtrl,
-        builder: (_, __) {
-          return SizedBox(
-            height: 42,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                ..._wfPlayed.map((h) => _WfBar(height: h, played: true, active: false, animVal: 0)),
-                _WfBar(
-                    height: _wfActive + _wfCtrl.value * 10,
-                    played: true,
-                    active: true,
-                    animVal: _wfCtrl.value),
-                ..._wfUnplayed
-                    .map((h) => _WfBar(height: h, played: false, active: false, animVal: 0)),
-              ],
-            ),
-          );
-        },
+        builder: (_, __) => SizedBox(
+          height: 42,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              ..._wfPlayedH.map((h) => _WfBar(height: h, played: true)),
+              _WfBar(height: _wfActiveH + _wfCtrl.value * 10, played: true),
+              ..._wfUnplayedH.map((h) => _WfBar(height: h, played: false)),
+            ],
+          ),
+        ),
       );
 
-  // ── Scrubber ──────────────────────────────────────────────
-  Widget _buildScrubber() {
-    return Row(children: [
-      Text(_fmt(_position),
-          style: const TextStyle(fontFamily: 'DM Sans', fontSize: 11, color: _C.muted)),
-      const SizedBox(width: 10),
-      Expanded(
-        child: LayoutBuilder(builder: (ctx, cst) {
-          return GestureDetector(
-            onTapDown: (d) => _seek(d.localPosition.dx / cst.maxWidth),
-            onHorizontalDragUpdate: (d) =>
-                _seek(((_progress * cst.maxWidth) + d.delta.dx) / cst.maxWidth),
-            child: Stack(clipBehavior: Clip.none, children: [
-              // Track
-              Container(
-                height: 4,
-                decoration:
-                    BoxDecoration(color: _C.scrubTrack, borderRadius: BorderRadius.circular(2)),
-              ),
-              // Fill
-              FractionallySizedBox(
-                widthFactor: _progress,
-                child: Container(
-                  height: 4,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [_C.scrubFill1, _C.scrubFill2]),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              // Thumb
-              Positioned(
-                left: (_progress * cst.maxWidth - 6).clamp(-6.0, cst.maxWidth - 6),
-                top: -4,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _C.cocoa,
-                    boxShadow: [
-                      BoxShadow(
-                          color: _C.cocoa.withOpacity(0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2))
-                    ],
-                  ),
-                ),
-              ),
-            ]),
-          );
-        }),
-      ),
-      const SizedBox(width: 10),
-      Text(_fmt(_duration),
-          style: const TextStyle(fontFamily: 'DM Sans', fontSize: 11, color: _C.muted)),
-    ]);
-  }
+  // ─── Scrubber ──────────────────────────────────────────────
+  Widget _buildScrubber() => Row(children: [
+        Text(_fmt(_position),
+            style: const TextStyle(fontFamily: 'DM Sans', fontSize: 11, color: AppColors.muted)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: LayoutBuilder(
+              builder: (_, cst) => GestureDetector(
+                    onTapDown: (d) => _seek(d.localPosition.dx / cst.maxWidth),
+                    onHorizontalDragUpdate: (d) =>
+                        _seek((_progress * cst.maxWidth + d.delta.dx) / cst.maxWidth),
+                    child: Stack(clipBehavior: Clip.none, children: [
+                      Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                              color: AppColors.dashBorder, borderRadius: BorderRadius.circular(2))),
+                      FractionallySizedBox(
+                        widthFactor: _progress,
+                        child: Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [
+                              AppColors.audioCardDark2,
+                              AppColors.dashGoldDark,
+                            ]),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: (_progress * cst.maxWidth - 6).clamp(-6.0, cst.maxWidth - 6),
+                        top: -4,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.cocoa,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: AppColors.cocoa.withOpacity(0.35),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2))
+                            ],
+                          ),
+                        ),
+                      ),
+                    ]),
+                  )),
+        ),
+        const SizedBox(width: 10),
+        Text(_fmt(_duration),
+            style: const TextStyle(fontFamily: 'DM Sans', fontSize: 11, color: AppColors.muted)),
+      ]);
 
-  // ── Play controls ─────────────────────────────────────────
+  // ─── Play controls ─────────────────────────────────────────
   Widget _buildPlayControls() => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _CtrlBtn(label: '«', onTap: () => _skip(const Duration(seconds: -10))),
           _CtrlBtn(label: '‹', onTap: () => _skip(const Duration(seconds: -5))),
-          // Play/Pause
           GestureDetector(
             onTap: () => _playing ? _player.pause() : _player.play(),
             child: Container(
@@ -662,19 +492,17 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
                 gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF4A2C14), Color(0xFF2A1A0E)]),
+                    colors: [Color(0xFF4A2C14), AppColors.audioCardDark2]),
                 boxShadow: [
                   BoxShadow(
-                      color: _C.cardDark2.withOpacity(0.35),
+                      color: AppColors.audioCardDark2.withOpacity(0.35),
                       blurRadius: 16,
                       offset: const Offset(0, 6)),
                 ],
               ),
               child: Center(
-                child: Text(
-                  _playing ? '⏸' : '▶',
-                  style: const TextStyle(fontSize: 18, color: _C.white),
-                ),
+                child: Text(_playing ? '⏸' : '▶',
+                    style: const TextStyle(fontSize: 18, color: Colors.white)),
               ),
             ),
           ),
@@ -683,21 +511,19 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
         ],
       );
 
-  // ── Loading / error ───────────────────────────────────────
+  // ─── Loading / Error ───────────────────────────────────────
   Widget _buildLoader() => const Scaffold(
-        backgroundColor: Color(0xFFFAF4E8),
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFC9943A), strokeWidth: 2),
+          child: CircularProgressIndicator(color: AppColors.gold, strokeWidth: 2),
         ),
       );
 
   Widget _buildError() => Scaffold(
-        backgroundColor: const Color(0xFFFAF4E8),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.wifi_off_rounded, size: 32, color: Color(0xFFC9943A)),
+              const Icon(Icons.wifi_off_rounded, size: 32, color: AppColors.gold),
               const SizedBox(height: 12),
               Text(_error ?? 'Something went wrong',
                   textAlign: TextAlign.center,
@@ -709,7 +535,7 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
                   decoration: BoxDecoration(
-                      color: const Color(0xFF2A1A0E), borderRadius: BorderRadius.circular(12)),
+                      color: AppColors.cocoaDeep, borderRadius: BorderRadius.circular(12)),
                   child: const Text('Retry',
                       style: TextStyle(
                           fontFamily: 'DM Sans',
@@ -724,20 +550,51 @@ class _AudioScreenState extends State<AudioScreen> with SingleTickerProviderStat
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-// WAVEFORM BAR
-// ─────────────────────────────────────────────────────────────
+// ─── Toggle switch ─────────────────────────────────────────────
+class _Toggle extends StatelessWidget {
+  final bool on;
+  const _Toggle({required this.on});
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 34,
+        height: 19,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(100),
+          gradient:
+              on ? const LinearGradient(colors: [Color(0xFF6B3A2A), AppColors.dashGoldDark]) : null,
+          color: on ? null : AppColors.cocoa.withOpacity(0.15),
+          boxShadow: on
+              ? [
+                  BoxShadow(
+                      color: AppColors.cocoa.withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2))
+                ]
+              : null,
+        ),
+        child: Align(
+          alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.all(3),
+            width: 13,
+            height: 13,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
+            ),
+          ),
+        ),
+      );
+}
+
+// ─── Waveform bar ──────────────────────────────────────────────
 class _WfBar extends StatelessWidget {
   final double height;
   final bool played;
-  final bool active;
-  final double animVal;
-  const _WfBar({
-    required this.height,
-    required this.played,
-    required this.active,
-    required this.animVal,
-  });
+  const _WfBar({required this.height, required this.played});
 
   @override
   Widget build(BuildContext context) => Expanded(
@@ -750,9 +607,12 @@ class _WfBar extends StatelessWidget {
                   ? const LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: [_C.wfPlayed1, _C.wfPlayed2])
+                      colors: [
+                          AppColors.audioCardDark2,
+                          AppColors.dashGoldDark,
+                        ])
                   : null,
-              color: played ? null : _C.wfUnplayed,
+              color: played ? null : AppColors.audioWfUnplayed,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -760,9 +620,7 @@ class _WfBar extends StatelessWidget {
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-// CONTROL BUTTON
-// ─────────────────────────────────────────────────────────────
+// ─── Control button ────────────────────────────────────────────
 class _CtrlBtn extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -776,27 +634,25 @@ class _CtrlBtn extends StatelessWidget {
           height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: _C.cocoa.withOpacity(0.08),
-            border: Border.all(color: _C.cocoa.withOpacity(0.18)),
+            color: AppColors.cocoa.withOpacity(0.08),
+            border: Border.all(color: AppColors.cocoa.withOpacity(0.18)),
           ),
           child: Center(
-            child: Text(label, style: const TextStyle(fontSize: 14, color: _C.cocoa)),
+            child: Text(label, style: const TextStyle(fontSize: 14, color: AppColors.cocoa)),
           ),
         ),
       );
 }
 
-// ─────────────────────────────────────────────────────────────
-// FLOATING MINI BOT
-// ─────────────────────────────────────────────────────────────
+// ─── Floating mini bot ─────────────────────────────────────────
 class _FloatingMiniBot extends StatefulWidget {
   @override
   State<_FloatingMiniBot> createState() => _FloatingMiniBotState();
 }
 
 class _FloatingMiniBotState extends State<_FloatingMiniBot> with SingleTickerProviderStateMixin {
-  late AnimationController _c;
-  late Animation<double> _anim;
+  late final AnimationController _c;
+  late final Animation<double> _anim;
 
   @override
   void initState() {
@@ -829,29 +685,25 @@ class _FloatingMiniBotState extends State<_FloatingMiniBot> with SingleTickerPro
 class _MiniBotPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = const Color(0xFFC9943A).withOpacity(0.55);
-    // Body
+    final p = Paint()..color = AppColors.dashGoldDark.withOpacity(0.55);
     canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(6, 11, 22, 18), const Radius.circular(6)), p);
-    // Head
-    p.color = const Color(0xFFC9943A).withOpacity(0.4);
+    p.color = AppColors.dashGoldDark.withOpacity(0.4);
     canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(10, 2, 14, 12), const Radius.circular(4)), p);
-    // Antenna
-    p.color = const Color(0xFFC9943A).withOpacity(0.55);
-    p.strokeWidth = 1.5;
-    p.style = PaintingStyle.stroke;
+    p
+      ..color = AppColors.dashGoldDark.withOpacity(0.55)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
     canvas.drawLine(const Offset(17, 2), const Offset(17, 0), p);
     p.style = PaintingStyle.fill;
     canvas.drawCircle(const Offset(17, 0), 2, p);
-    // Eyes
-    p.color = const Color(0xFFFAF6EE);
+    p.color = AppColors.white;
     canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(12, 5, 4, 4), const Radius.circular(2)), p);
     canvas.drawRRect(
         RRect.fromRectAndRadius(Rect.fromLTWH(18, 5, 4, 4), const Radius.circular(2)), p);
-    // Belly buttons
-    p.color = const Color(0xFFFAF6EE).withOpacity(0.7);
+    p.color = AppColors.white.withOpacity(0.7);
     canvas.drawCircle(const Offset(14, 20), 2, p);
     canvas.drawCircle(const Offset(20, 20), 2, p);
   }

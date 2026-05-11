@@ -1,4 +1,3 @@
-// screens/upload_screen.dart
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -91,7 +90,6 @@ class _UploadScreenState extends State<UploadScreen> {
               ]),
             ),
 
-            // ── Body
             Expanded(
               child: Center(
                 child: Padding(
@@ -140,7 +138,6 @@ class _UploadScreenState extends State<UploadScreen> {
                     ),
                     const SizedBox(height: 28),
 
-                    // Pick file button
                     GestureDetector(
                       onTap: _picking ? null : _pickFile,
                       child: AnimatedOpacity(
@@ -183,7 +180,6 @@ class _UploadScreenState extends State<UploadScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Supported formats chips
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,

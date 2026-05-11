@@ -364,14 +364,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                       ),
 
-                      // Take Quiz button
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-                        child: AppButton(
-                          label: 'Take Quiz  ✦',
-                          onTap: () => Navigator.pushNamed(context, '/upload'),
-                        ),
-                      ),
                     ],
 
                     const SizedBox(height: 8),

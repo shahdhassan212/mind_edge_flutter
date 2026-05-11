@@ -1,4 +1,3 @@
-// screens/splash_screen.dart — with real session check
 import 'package:flutter/material.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/animation_helpers.dart';
@@ -47,7 +46,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       backgroundColor: const Color(0xFFFDF8F0),
       body: Stack(fit: StackFit.expand, children: [
         Container(decoration: const BoxDecoration(gradient: AppGradients.splash)),
-
         Positioned(
             top: -40,
             left: 0,
@@ -70,7 +68,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           0.5,
                           1.0
                         ]))))),
-
         Positioned.fill(
             child: Center(
                 child: AmbientRotate(
@@ -86,8 +83,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                               const Color(0xFFB4823C).withOpacity(0.0)
                             ]),
                             shape: BoxShape.circle))))),
-
-        // Halo rings
         Positioned(
             top: size.height * 0.22,
             left: size.width * 0.5 - 110,
@@ -106,8 +101,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: const Color(0xFFB4823C).withOpacity(0.055))))),
-
-        // Companion bots
         Positioned(
             top: size.height * 0.14,
             left: 8,
@@ -148,7 +141,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 translateYMin: 2,
                 translateYMax: -6,
                 child: const CompanionBot(size: 30, opacity: 0.5))),
-
         SafeArea(
             child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
           SizedBox(height: isSmall ? 24 : 36),
@@ -188,7 +180,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         letterSpacing: 1.5)),
               ])),
 
-          // Robot
           Expanded(
               child: FadeUpEntrance(
                   delay: const Duration(milliseconds: 500),
@@ -203,7 +194,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           child: Transform.scale(
                               scale: isSmall ? 1.1 : 1.3, child: const MainRobot()))))),
 
-          // Book
           FadeUpEntrance(
               delay: const Duration(milliseconds: 700),
               duration: const Duration(milliseconds: 1100),
@@ -216,7 +206,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
           SizedBox(height: isSmall ? 8 : 16),
 
-          // Loader bar
           FadeUpEntrance(
               delay: const Duration(milliseconds: 1000),
               child: Padding(

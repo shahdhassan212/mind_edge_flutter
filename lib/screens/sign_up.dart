@@ -1,4 +1,3 @@
-// screens/sign_up.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/design_tokens.dart';
@@ -38,7 +37,6 @@ class SignUpScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Progress bar
                 SizedBox(
                   height: 3,
                   child: Row(children: [
@@ -51,7 +49,6 @@ class SignUpScreen extends ConsumerWidget {
                     ),
                   ]),
                 ),
-
                 Expanded(
                   child: SingleChildScrollView(
                     padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
@@ -140,8 +137,6 @@ class SignUpScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-
-                // ── Footer
                 Padding(
                   padding: const EdgeInsets.fromLTRB(30, 8, 30, 24),
                   child: Center(
@@ -181,7 +176,6 @@ class SignUpScreen extends ConsumerWidget {
   }
 }
 
-// ─── Decorative radial orb (same as sign_in) ──────────────────
 class _DecorOrb extends StatelessWidget {
   final double? top, bottom, left, right, size;
   final Color color;

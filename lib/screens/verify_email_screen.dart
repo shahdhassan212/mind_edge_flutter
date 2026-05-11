@@ -1,4 +1,3 @@
-// screens/verify_email_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,8 +14,7 @@ class VerifyEmailScreen extends ConsumerStatefulWidget {
 }
 
 class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
-  final List<TextEditingController> _ctrls =
-      List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _ctrls = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _nodes = List.generate(6, (_) => FocusNode());
 
   int _seconds = 8 * 60 + 34;
@@ -88,17 +86,14 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         height: double.infinity,
         decoration: const BoxDecoration(gradient: AppGradients.signIn),
         child: Stack(children: [
-          AppDecorOrb(top: -70, right: -70, size: 260,
-              color: AppColors.gold.withOpacity(0.12)),
-          AppDecorOrb(bottom: -80, left: -80, size: 260,
-              color: AppColors.cocoa.withOpacity(0.08)),
+          AppDecorOrb(top: -70, right: -70, size: 260, color: AppColors.gold.withOpacity(0.12)),
+          AppDecorOrb(bottom: -80, left: -80, size: 260, color: AppColors.cocoa.withOpacity(0.08)),
           SafeArea(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const AppScreenTopBar(title: 'Verify Email'),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 24),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                     // ── Header
                     Padding(
@@ -127,13 +122,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                               TextSpan(
                                   text: widget.email,
                                   style: const TextStyle(
-                                      color: AppColors.cocoa,
-                                      fontWeight: FontWeight.w600))
+                                      color: AppColors.cocoa, fontWeight: FontWeight.w600))
                             ])),
                       ]),
                     ),
 
-                    // ── OTP boxes
                     OtpRow(
                       controllers: _ctrls,
                       focusNodes: _nodes,
@@ -141,19 +134,16 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                         setState(() {});
                         if (_ctrls[i].text.length == 1 && i < 5)
                           _nodes[i + 1].requestFocus();
-                        else if (_ctrls[i].text.isEmpty && i > 0)
-                          _nodes[i - 1].requestFocus();
+                        else if (_ctrls[i].text.isEmpty && i > 0) _nodes[i - 1].requestFocus();
                       },
                     ),
 
-                    // ── Timer + resend
                     _TimerResend(
                       timerLabel: _timerLabel,
                       onResend: isLoading
                           ? null
-                          : () => ref
-                              .read(verifyEmailProvider.notifier)
-                              .resend(email: widget.email),
+                          : () =>
+                              ref.read(verifyEmailProvider.notifier).resend(email: widget.email),
                     ),
 
                     const SizedBox(height: 20),
@@ -176,7 +166,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   }
 }
 
-// ── Shared across verify + forgot_code ────────────────────────
 class _EmailIcon extends StatelessWidget {
   const _EmailIcon();
 
@@ -189,8 +178,7 @@ class _EmailIcon extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white.withOpacity(0.65),
-          border: Border.all(
-              color: const Color(0xFFB48C50).withOpacity(0.2), width: 1.5),
+          border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.2), width: 1.5),
           boxShadow: [
             BoxShadow(
                 color: const Color(0xFF643C14).withOpacity(0.1),
@@ -232,8 +220,7 @@ class _TimerResend extends StatelessWidget {
             children: [
               TextSpan(
                   text: timerLabel,
-                  style: const TextStyle(
-                      color: AppColors.cocoa, fontWeight: FontWeight.w600))
+                  style: const TextStyle(color: AppColors.cocoa, fontWeight: FontWeight.w600))
             ])),
         const SizedBox(height: 8),
         Text.rich(TextSpan(

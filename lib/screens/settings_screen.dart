@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/robot_widget.dart';
 import '../features/auth/auth_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -13,9 +14,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _audioOn = true;
-  bool _captionsOn = true;
-
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(signOutProvider, (_, next) {
@@ -60,10 +58,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
         child: Stack(children: [
-          AppDecorOrb(top: -60, right: -60, size: 220, color: AppColors.gold.withOpacity(0.12)),
+          // Top-right glow
+          Positioned(
+            top: -60,
+            right: -60,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.gold.withOpacity(0.12),
+                    Colors.transparent,
+                  ],
+                  radius: 0.68,
+                ),
+              ),
+            ),
+          ),
+
           SafeArea(
             child: Column(children: [
-              // ── Nav (has SizedBox placeholder — not AppScreenTopBar)
+              // ── Nav bar
               Padding(
                 padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
                 child: Row(children: [
@@ -84,11 +101,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(bottom: 32),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      const SizedBox(height: 24),
+
+                      // ── Robot + greeting
+                      const SizedBox(
+                        width: 110,
+                        height: 120,
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          child: MainRobot(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Hello, $displayName',
+                        style: const TextStyle(
+                          fontFamily: 'Syne',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.cocoaDeep,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        displayEmail,
+                        style: const TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 12,
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w300,
+                        ),
+                      ),
+
+                      const SizedBox(height: 28),
+
                       // ── Profile card
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(26, 16, 26, 0),
+                        padding: const EdgeInsets.symmetric(horizontal: 26),
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -98,18 +150,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             boxShadow: AppShadows.md,
                           ),
                           child: Row(children: [
+                            // Avatar circle
                             Container(
-                              width: 48,
-                              height: 48,
+                              width: 52,
+                              height: 52,
                               decoration: const BoxDecoration(
                                   shape: BoxShape.circle, gradient: AppGradients.ctaButton),
                               child: Center(
-                                child: Text(avatarLetter,
-                                    style: const TextStyle(
-                                        fontFamily: 'Syne',
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.white)),
+                                child: Text(
+                                  avatarLetter,
+                                  style: const TextStyle(
+                                      fontFamily: 'Syne',
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.white),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -117,119 +172,158 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(displayName,
-                                      style: const TextStyle(
-                                          fontFamily: 'Syne',
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.cocoaDeep)),
-                                  Text(displayEmail,
-                                      style: const TextStyle(
-                                          fontFamily: 'DM Sans',
-                                          fontSize: 12,
-                                          color: AppColors.muted,
-                                          fontWeight: FontWeight.w300)),
+                                  Text(
+                                    displayName,
+                                    style: const TextStyle(
+                                        fontFamily: 'Syne',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.cocoaDeep),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    displayEmail,
+                                    style: const TextStyle(
+                                        fontFamily: 'DM Sans',
+                                        fontSize: 11.5,
+                                        color: AppColors.muted,
+                                        fontWeight: FontWeight.w300),
+                                  ),
                                 ],
                               ),
                             ),
-                            const Text('Edit',
-                                style: TextStyle(
-                                    fontFamily: 'DM Sans',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.cocoa)),
                           ]),
                         ),
                       ),
 
-                      _Section(label: 'AI PREFERENCES', children: [
-                        _RowToggle(
-                            icon: '🤖',
-                            title: 'AI Audio Explanations',
-                            sub: 'Auto-generate for new content',
-                            on: _audioOn,
-                            onTap: () => setState(() => _audioOn = !_audioOn)),
-                        _RowToggle(
-                            icon: '📝',
-                            title: 'Auto Captions',
-                            sub: 'Show transcript while listening',
-                            on: _captionsOn,
-                            onTap: () => setState(() => _captionsOn = !_captionsOn)),
-                        _RowValue(
-                            icon: '✦',
-                            title: 'Summary Mode',
-                            sub: 'Default output format',
-                            value: 'Bullets ›',
-                            onTap: () {}),
-                      ]),
+                      const SizedBox(height: 16),
 
-                      _Section(label: 'STUDY SETTINGS', children: [
-                        _RowValue(
-                            icon: '🔔', title: 'Daily Reminders', value: '9:00 AM ›', onTap: () {}),
-                        _RowValue(
-                            icon: '🎯', title: 'Daily Goal', value: '2 hours ›', onTap: () {}),
-                        _RowValue(icon: '🌐', title: 'Language', value: 'English ›', onTap: () {}),
-                      ]),
-
-                      _Section(label: 'ACCOUNT', children: [
-                        _RowValue(
-                            icon: '🔒',
-                            title: 'Change Password',
-                            value: '›',
-                            onTap: () => Navigator.pushNamed(context, '/forgot-email')),
-                        _RowValue(icon: '📤', title: 'Export Data', value: '›', onTap: () {}),
-                        _RowValue(
-                            icon: '🗑️',
-                            title: 'Delete Account',
-                            value: '›',
-                            valueColor: const Color(0xFF9C2A1E),
-                            onTap: () {}),
-                      ]),
-
-                      // ── Sign out
+                      // ── Account section
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(26, 12, 26, 0),
-                        child: GestureDetector(
-                          onTap: isLoggingOut
-                              ? null
-                              : () => ref.read(signOutProvider.notifier).signOut(),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.55),
-                              border: Border.all(color: const Color(0xFFC0392B).withOpacity(0.25)),
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: AppShadows.sm,
+                        padding: const EdgeInsets.symmetric(horizontal: 26),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(left: 4, bottom: 8),
+                              child: Text(
+                                'ACCOUNT',
+                                style: TextStyle(
+                                    fontFamily: 'DM Sans',
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 1.0,
+                                    color: AppColors.muted),
+                              ),
                             ),
-                            child: isLoggingOut
-                                ? const Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2, color: Color(0xFF9C2A1E)),
-                                    ),
-                                  )
-                                : const Center(
-                                    child: Text('Sign Out',
-                                        style: TextStyle(
-                                            fontFamily: 'DM Sans',
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF9C2A1E))),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.62),
+                                border:
+                                    Border.all(color: const Color(0xFFB48C50).withOpacity(0.14)),
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: AppShadows.sm,
+                              ),
+                              child: Column(children: [
+                                // Change Password
+                                GestureDetector(
+                                  onTap: () => Navigator.pushNamed(context, '/forgot-email'),
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                                    child: Row(children: [
+                                      Container(
+                                        width: 34,
+                                        height: 34,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.cocoa.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border:
+                                              Border.all(color: AppColors.cocoa.withOpacity(0.12)),
+                                        ),
+                                        child: const Center(
+                                          child: Icon(Icons.lock_outline_rounded,
+                                              size: 16, color: AppColors.cocoa),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      const Expanded(
+                                        child: Text(
+                                          'Change Password',
+                                          style: TextStyle(
+                                              fontFamily: 'DM Sans',
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.cocoaDeep),
+                                        ),
+                                      ),
+                                      const Icon(Icons.arrow_forward_ios_rounded,
+                                          size: 13, color: AppColors.muted),
+                                    ]),
                                   ),
-                          ),
+                                ),
+                              ]),
+                            ),
+                          ],
                         ),
                       ),
 
                       const SizedBox(height: 16),
-                      const Center(
-                        child: Text('MindEdge v1.0.0',
-                            style: TextStyle(
-                                fontFamily: 'DM Sans',
-                                fontSize: 11,
-                                color: AppColors.muted,
-                                fontWeight: FontWeight.w300)),
+
+                      // ── Sign out button
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 26),
+                        child: GestureDetector(
+                          onTap: isLoggingOut
+                              ? null
+                              : () => ref.read(signOutProvider.notifier).signOut(),
+                          child: AnimatedOpacity(
+                            opacity: isLoggingOut ? 0.6 : 1,
+                            duration: const Duration(milliseconds: 150),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.55),
+                                border:
+                                    Border.all(color: const Color(0xFFC0392B).withOpacity(0.25)),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: AppShadows.sm,
+                              ),
+                              child: isLoggingOut
+                                  ? const Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2, color: Color(0xFF9C2A1E)),
+                                      ),
+                                    )
+                                  : const Center(
+                                      child: Text(
+                                        'Sign Out',
+                                        style: TextStyle(
+                                            fontFamily: 'DM Sans',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF9C2A1E)),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ── Version
+                      const Text(
+                        'MindEdge v1.0.0',
+                        style: TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 11,
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w300),
                       ),
                     ],
                   ),
@@ -241,187 +335,4 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-}
-
-class _Section extends StatelessWidget {
-  final String label;
-  final List<Widget> children;
-  const _Section({required this.label, required this.children});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(26, 16, 26, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style: const TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.0,
-                    color: AppColors.muted)),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.62),
-                border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.14)),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: AppShadows.sm,
-              ),
-              child: Column(
-                children: children.asMap().entries.map((e) {
-                  final isLast = e.key == children.length - 1;
-                  return Column(children: [
-                    e.value,
-                    if (!isLast)
-                      Divider(height: 1, color: const Color(0xFFB48C50).withOpacity(0.1)),
-                  ]);
-                }).toList(),
-              ),
-            ),
-          ],
-        ),
-      );
-}
-
-class _RowToggle extends StatelessWidget {
-  final String icon, title, sub;
-  final bool on;
-  final VoidCallback onTap;
-  const _RowToggle({
-    required this.icon,
-    required this.title,
-    required this.sub,
-    required this.on,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          child: Row(children: [
-            Text(icon, style: const TextStyle(fontSize: 16)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.cocoaDeep)),
-                  Text(sub,
-                      style: const TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 10.5,
-                          color: AppColors.muted,
-                          fontWeight: FontWeight.w300)),
-                ],
-              ),
-            ),
-            _Toggle(on: on),
-          ]),
-        ),
-      );
-}
-class _RowValue extends StatelessWidget {
-  final String icon, title, value;
-  final String? sub;
-  final Color? valueColor;
-  final VoidCallback onTap;
-  const _RowValue({
-    required this.icon,
-    required this.title,
-    required this.value,
-    this.sub,
-    this.valueColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          child: Row(children: [
-            Text(icon, style: const TextStyle(fontSize: 16)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: sub != null
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title,
-                            style: const TextStyle(
-                                fontFamily: 'DM Sans',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.cocoaDeep)),
-                        Text(sub!,
-                            style: const TextStyle(
-                                fontFamily: 'DM Sans',
-                                fontSize: 10.5,
-                                color: AppColors.muted,
-                                fontWeight: FontWeight.w300)),
-                      ],
-                    )
-                  : Text(title,
-                      style: const TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.cocoaDeep)),
-            ),
-            Text(value,
-                style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: valueColor ?? AppColors.cocoa)),
-          ]),
-        ),
-      );
-}
-
-class _Toggle extends StatelessWidget {
-  final bool on;
-  const _Toggle({required this.on});
-
-  @override
-  Widget build(BuildContext context) => AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 34,
-        height: 19,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(100),
-          gradient: on ? const LinearGradient(colors: [AppColors.cocoa, AppColors.gold]) : null,
-          color: on ? null : AppColors.cocoa.withOpacity(0.15),
-          boxShadow: on
-              ? [
-                  BoxShadow(
-                      color: AppColors.cocoa.withOpacity(0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2))
-                ]
-              : null,
-        ),
-        child: Align(
-          alignment: on ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.all(3),
-            width: 13,
-            height: 13,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
-            ),
-          ),
-        ),
-      );
 }

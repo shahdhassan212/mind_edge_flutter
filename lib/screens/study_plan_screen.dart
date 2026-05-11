@@ -1,4 +1,3 @@
-// screens/study_plan_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +8,6 @@ import '../widgets/animation_helpers.dart';
 import '../widgets/common_widgets.dart';
 
 class StudyPlanScreen extends ConsumerStatefulWidget {
-  // filename comes from ai_analysis_screen via Navigator arguments
   final String? filename;
 
   const StudyPlanScreen({super.key, this.filename});
@@ -19,11 +17,11 @@ class StudyPlanScreen extends ConsumerStatefulWidget {
 }
 
 class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
-  final _subjectCtrl = TextEditingController(text: 'Organic Chemistry');
-  final _daysCtrl = TextEditingController(text: '30');
+  final _subjectCtrl = TextEditingController(text: 'bioimformatics');
+  final _daysCtrl = TextEditingController(text: '14');
 
-  int _daily = 1; // 0=1h  1=2h  2=3h+
-  int _diff = 0; // 0=Beginner  1=Advanced
+  int _daily = 1;
+  int _diff = 0;
 
   @override
   void dispose() {
@@ -166,7 +164,6 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
                       ),
                     ),
 
-                    // ── Filename chip (shows which doc is selected)
                     if (widget.filename != null)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
@@ -195,7 +192,6 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
                         ]),
                       ),
 
-                    // ── Options
                     Padding(
                       padding: const EdgeInsets.fromLTRB(26, 12, 26, 0),
                       child: Column(children: [
@@ -211,7 +207,7 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
                         _OptionRow(
                             title: 'Difficulty',
                             sub: 'Current level',
-                            options: const ['Beginner', 'Advanced'],
+                            options: const ['Beginner', 'Intermediate', 'Advanced'],
                             selected: _diff,
                             onSelect: (i) => setState(() => _diff = i)),
                       ]),
@@ -252,7 +248,6 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
                       ),
                     ),
 
-                    // ── Generate button
                     Padding(
                       padding: const EdgeInsets.fromLTRB(26, 12, 26, 8),
                       child: isGenerating
@@ -278,34 +273,6 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
                               onTap: _generate,
                             ),
                     ),
-
-                    // ── View Progress
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(26, 0, 26, 20),
-                      child: GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, '/dashboard'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          decoration: BoxDecoration(
-                            color: AppColors.cocoa.withValues(alpha: 0.08),
-                            border: Border.all(
-                                color: AppColors.cocoa.withValues(alpha: 0.22), width: 1.5),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'View Progress',
-                              style: TextStyle(
-                                  fontFamily: 'DM Sans',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.cocoa,
-                                  letterSpacing: 0.2),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   ]),
                 ),
               ),
@@ -317,7 +284,6 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
   }
 }
 
-// ─── Days input ────────────────────────────────────────────────
 class _DaysInput extends StatelessWidget {
   final TextEditingController controller;
   const _DaysInput({required this.controller});
@@ -403,7 +369,6 @@ class _DaysInput extends StatelessWidget {
   }
 }
 
-// ─── Option row ────────────────────────────────────────────────
 class _OptionRow extends StatelessWidget {
   final String title, sub;
   final List<String> options;
