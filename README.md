@@ -1,279 +1,220 @@
-# MindEdge — AI-Powered Study Companion
+# MindEdge — AI-Powered Education Assistant
 
-MindEdge is a cross-platform mobile application built with Flutter that transforms static study materials into personalized, interactive learning experiences. By integrating a cloud-based AI backend, the application automates document analysis, quiz generation, study planning, and audio summarization — reducing the manual effort students typically spend organizing and reviewing their coursework.
+> A cross-platform Flutter application that turns any study material — PDFs, slides, scanned notes, or images — into an interactive learning experience powered by AI: summaries, definitions, rules, visual graph analysis, conversational Q&A, auto-generated quizzes, and personalized study plans.
+
+**Graduation Project • Faculty of Computers and Artificial Intelligence**
 
 ---
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [System Architecture](#system-architecture)
-- [Project Structure](#project-structure)
-- [Tech Stack](#tech-stack)
-- [Core User Flows](#core-user-flows)
-- [API Integration](#api-integration)
-- [Authentication](#authentication)
-- [State Management](#state-management)
-- [Design System](#design-system)
-- [Getting Started](#getting-started)
+1. [Overview](#overview)
+2. [Key Features](#key-features)
+3. [Screens & User Flow](#screens--user-flow)
+4. [Tech Stack](#tech-stack)
+5. [Architecture](#architecture)
+6. [Project Structure](#project-structure)
+7. [Getting Started](#getting-started)
+8. [Configuration](#configuration)
+9. [API Endpoints](#api-endpoints)
+10. [Authentication Flow](#authentication-flow)
+11. [State Management](#state-management)
+12. [Local Storage](#local-storage)
+13. [Building for Release](#building-for-release)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Overview
 
-Students frequently struggle with organizing large volumes of study material, identifying key concepts, and maintaining consistent study schedules. MindEdge addresses these challenges by providing an end-to-end AI-assisted study workflow accessible from a single mobile interface.
+**MindEdge** is an intelligent study companion designed to help students absorb academic content faster and more effectively. The app accepts uploaded documents (PDF, DOCX, images) or live camera scans, processes them through an AI backend, and produces:
 
-The application communicates with a RESTful ASP.NET Core backend that handles document processing, natural language understanding, and plan generation. The Flutter client is responsible for all presentation logic, state management, and user interactions.
+- Concise **summaries** of the material.
+- Extracted **rules**, **definitions**, and **key concepts**.
+- **Visual analysis** of charts and figures embedded in documents.
+- An **AI chat** session bound to the document for follow-up questions.
+- Auto-generated **quizzes** with instant grading and feedback.
+- A personalized **study plan** with progress tracking on the dashboard.
+
+The mobile client is built in Flutter and talks to an ASP.NET backend hosted at `https://midedge.runasp.net`.
 
 ---
 
-## Features
+## Key Features
 
 | Feature | Description |
-|---|---|
-| Document Analysis | Upload PDFs, images, or Word documents. The AI pipeline extracts raw text, identifies graphs, generates a corrected analysis, and classifies rules and definitions. |
-| Quiz Generation | Automatically generates multiple-choice and written-answer questions from uploaded documents. Answers are evaluated server-side with per-question explanations. |
-| Study Plan Builder | Generates a structured day-by-day study plan based on the document content, desired duration, daily hours, and difficulty level. |
-| Audio Summaries | Converts AI-generated document summaries into audio for passive listening. |
-| AI Chat | Allows the user to ask contextual questions about their uploaded document in a conversational interface. |
-| Task Management | Users can view and toggle the completion status of individual study tasks across all active plans. |
-| Document Library | Centralizes all uploaded files for retrieval and re-analysis. |
-| Secure Authentication | JWT-based registration and login with automatic token refresh and secure local storage. |
+| --- | --- |
+| **Authentication** | Sign up, sign in, email OTP verification, forgot/reset password, token refresh, secure logout. |
+| **Document Upload** | Pick PDFs or images from device storage with `file_picker`. |
+| **Camera Scan + OCR** | Capture documents directly via the camera, then run server-side OCR. |
+| **AI Analysis** | Summary, rules extraction, definitions, and visual/graph analysis per document. |
+| **AI Chat** | Conversational session anchored to the uploaded document with markdown + LaTeX math rendering. |
+| **Quizzes** | Generate quizzes by document, auto-grade, and review results. |
+| **Study Plans** | Personalized plan generation, dashboard tasks, and progress tracking. |
+| **Library** | Locally cached folders (Hive) that organize uploaded files. |
+| **Audio Mode** | Audio playback for narrated content. |
+| **Onboarding** | Three animated onboarding screens powered by Rive. |
+| **Theming** | Centralized design tokens, custom theme, and Google Fonts. |
 
 ---
 
-## System Architecture
+## Screens & User Flow
 
 ```
-Flutter Client (Dart)
-        |
-        | HTTPS / REST
-        |
-ASP.NET Core API (midedge.runasp.net)
-        |
-        |--- AI Processing Pipeline
-        |--- Document Storage
-        |--- Study Plan Engine
-        |--- Quiz Evaluation Engine
-```
-
-The Flutter client follows a layered architecture:
-
-```
-UI Layer (Screens / Widgets)
-        |
-Provider Layer (Riverpod StateNotifiers)
-        |
-Repository Layer (Dio HTTP calls)
-        |
-Core Layer (DioClient, TokenStorage, ApiEndpoints)
-```
-
----
-
-## Project Structure
-
-```
-lib/
-├── core/
-│   ├── network/
-│   │   ├── dio_client.dart               # Shared Dio instance with interceptor chain
-│   │   └── dio_interceptors.dart         # Auth, logging, and error interceptors
-│   ├── errors/
-│   │   ├── app_exception.dart
-│   │   └── dio_error_handler.dart
-│   ├── api_endpoints.dart                # Single source of truth for all API paths
-│   └── token_storage.dart                # Secure JWT persistence (flutter_secure_storage)
-│
-├── features/
-│   ├── auth/
-│   │   ├── auth_models.dart              # SignInRequest, SignUpRequest, UserModel, etc.
-│   │   ├── auth_repostiries.dart         # Network calls for all auth endpoints
-│   │   ├── auth_view_model.dart          # AuthViewModel + infrastructure providers
-│   │   └── auth_providers.dart           # Form-level view models (sign in, sign up, OTP)
-│   │
-│   ├── analysis/
-│   │   ├── model/
-│   │   │   ├── analysis_models.dart      # VisualAnalysisModel, AudioSummaryModel, RulesModel, etc.
-│   │   │   └── quiz_models.dart          # QuizQuestion, QuizGenerateResponse, QuizSubmitResponse
-│   │   ├── repository/
-│   │   │   ├── analysis_repository.dart  # Document analysis API calls
-│   │   │   └── quiz_repository.dart      # Quiz generate and submit API calls
-│   │   └── providers/
-│   │       ├── analysis_providersl.dart  # AnalysisViewModel + StateNotifierProvider
-│   │       └── quiz_providers.dart       # QuizViewModel + StateNotifierProvider
-│   │
-│   ├── study_plan/
-│   │   ├── model/study_plan_models.dart  # StudyPlanResponse, DashboardTask, PlanArchiveItem
-│   │   ├── repository/study_plan_repository.dart
-│   │   └── providers/study_plan_provider.dart
-│   │
-│   └── files/
-│       ├── models/file_model.dart
-│       ├── repositories/files_repository.dart
-│       └── providers/files_provider.dart
-│
-├── screens/
-│   ├── splash_screen.dart
-│   ├── onboarding_1.dart
-│   ├── onboarding_2.dart
-│   ├── onboarding_3.dart
-│   ├── sign_in.dart
-│   ├── sign_up.dart
-│   ├── verify_email_screen.dart
-│   ├── forgot_password_email.dart
-│   ├── forgot_password_code.dart
-│   ├── forgot_password_newpass.dart
-│   ├── forgot_password_success.dart
-│   ├── dashboard_screen.dart
-│   ├── upload_screen.dart
-│   ├── ai_analysis_screen.dart
-│   ├── ai_chat_screen.dart
-│   ├── quiz_screen.dart
-│   ├── quiz_result_screen.dart
-│   ├── study_plan_screen.dart
-│   ├── plans_screen.dart
-│   ├── audio_screen.dart
-│   ├── library_screen.dart
-│   ├── scan_screen.dart
-│   └── settings_screen.dart
-│
-├── widgets/
-│   ├── common_widgets.dart
-│   ├── dashboard_widgets.dart
-│   ├── ai_analysis_widgets.dart
-│   ├── animation_helpers.dart
-│   └── robot_widget.dart
-│
-├── theme/
-│   └── design_tokens.dart               # Color palette, gradients, shadows, typography constants
-│
-└── app_router.dart                       # Centralized named route definitions and transitions
+Splash
+  ├── Token found → Dashboard
+  └── No token   → Onboarding (3 screens) → Sign In / Sign Up
+                                              ↓
+                                        Verify Email (OTP)
+                                              ↓
+                                          Dashboard
+                                              ↓
+   ┌──────────────┬──────────────┬──────────────┬──────────────┐
+   │   Library    │    Upload    │    Plans     │   Settings   │
+   └──────────────┴──────────────┴──────────────┴──────────────┘
+          │              │               │
+          │         Scan / Pick          │
+          │              ↓               │
+          │       AI Analysis ←──────────┘
+          │         ↓        ↓
+          │      AI Chat   Quiz → Quiz Result
+          │                  ↓
+          │            Study Plan
+          ↓
+     Forgot Password → Code → New Password → Success → Sign In
 ```
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Flutter 3.x (Dart) |
-| State Management | Riverpod — StateNotifier, FutureProvider, Provider |
-| HTTP Client | Dio with custom interceptor chain |
-| Authentication | JWT with automatic refresh via AuthInterceptor |
-| Secure Storage | flutter_secure_storage |
-| File Picking | file_picker |
-| Camera | camera package with permission_handler |
-| Text Rendering | flutter_markdown |
-| Backend | ASP.NET Core Web API |
+**Framework & Language**
+- Flutter (SDK `>=3.3.0 <4.0.0`)
+- Dart
+
+**State Management**
+- `flutter_riverpod` ^2.5.1
+
+**Networking**
+- `dio` ^5.4.0 — typed HTTP client with interceptors for auth and error handling.
+- `connectivity_plus` ^6.0.3
+
+**Storage**
+- `flutter_secure_storage` ^9.0.0 — JWT and refresh tokens.
+- `hive` + `hive_flutter` — local cache for the user's library/folders.
+
+**Media & Files**
+- `file_picker`, `image_picker`, `camera`, `permission_handler`, `path_provider`, `open_filex`.
+
+**Audio**
+- `just_audio` ^0.9.36, `audio_session` ^0.1.18.
+
+**UI & Animation**
+- `google_fonts` ^6.2.1
+- `rive` ^0.13.0 — onboarding & mascot animations.
+- `flutter_markdown` ^0.7.4 + `flutter_math_fork` ^0.7.4 — render AI responses with markdown and LaTeX math.
+
+**Tooling**
+- `flutter_lints`, `flutter_launcher_icons`.
 
 ---
 
-## Core User Flows
+## Architecture
 
-**Onboarding and Authentication**
-```
-Splash -> Onboarding (1/2/3) -> Sign Up -> Email Verification -> Dashboard
-                              -> Sign In -> Dashboard
-```
+The app follows a **feature-first / layered architecture**:
 
-**Document Analysis**
 ```
-Dashboard -> Upload Screen -> AI Analysis Screen
-                                  -> Summary Tab
-                                  -> Rules and Formulas Tab
-                                  -> Visual Analysis Tab
-                                  -> Definitions Tab
-                                  -> AI Chat
-```
-
-**Quiz Flow**
-```
-AI Analysis Screen -> Quiz Screen (MCQ + Written) -> Submit -> Quiz Result Screen
+Presentation (screens, widgets)
+        │   uses
+        ▼
+   ViewModels / Providers (Riverpod)
+        │   call
+        ▼
+     Repositories (per feature)
+        │   delegate to
+        ▼
+   Network Layer (Dio client + interceptors)
+        │
+        ▼
+        Backend (ASP.NET — midedge.runasp.net)
 ```
 
-**Study Plan Flow**
-```
-AI Analysis Screen -> Study Plan Screen (form) -> Generate -> Dashboard (tasks visible)
-Dashboard -> View Plans -> Plans Screen (archive + task toggle)
-```
+Each feature owns its own `models/`, `repositories/`, and `providers/`. UI screens stay thin and only react to provider state.
 
 ---
 
-## API Integration
-
-All requests target `https://midedge.runasp.net`. Every feature repository receives the shared `DioClient` instance via Riverpod dependency injection, ensuring the `AuthInterceptor` attaches the Bearer token automatically.
-
-| Module | Method | Endpoint |
-|---|---|---|
-| Auth | POST | `/api/Auth/register` |
-| Auth | POST | `/api/Auth/login` |
-| Auth | POST | `/api/Auth/refresh-token` |
-| Auth | POST | `/api/Auth/verify-email` |
-| Auth | POST | `/api/Auth/forgot-password` |
-| Auth | POST | `/api/Auth/reset-password` |
-| Document | POST | `/api/Document/analyze-visuals` |
-| Document | POST | `/api/Document/summary` |
-| Document | GET | `/api/Document/get-rules` |
-| Document | GET | `/api/Document/get-definitions` |
-| Quiz | POST | `/api/Quiz/generate` |
-| Quiz | POST | `/api/Quiz/submit` |
-| Study Plan | POST | `/api/StudyPlan/generate` |
-| Study Plan | GET | `/api/StudyPlan/dashboard` |
-| Study Plan | GET | `/api/StudyPlan/archive-names` |
-| Study Plan | GET | `/api/StudyPlan/plan-by-file` |
-| Study Plan | PATCH | `/api/StudyPlan/tasks/{id}/toggle` |
-| Files | POST | `/api/File/Upload` |
-| Files | GET | `/api/File/ListFiles` |
-
----
-
-## Authentication
-
-The application uses a JWT-based authentication flow:
-
-1. On successful login, the server returns a signed JWT token.
-2. The client decodes the token payload client-side to extract user claims (`name`, `email`, `id`) without an additional profile request.
-3. The access token and refresh token are persisted using `flutter_secure_storage`.
-4. The `AuthInterceptor` automatically attaches the `Authorization: Bearer <token>` header to all non-public requests.
-5. On receiving a 401 response, the interceptor attempts a silent token refresh using the stored refresh token. If successful, the original request is retried transparently. If the refresh fails, the session is cleared and the user is redirected to sign in.
-
----
-
-## State Management
-
-The project uses Riverpod with the `StateNotifier` pattern throughout. Every feature follows the same structure:
+## Project Structure
 
 ```
-Repository
-    Handles all HTTP communication with the backend.
-    Receives DioClient via constructor injection.
-    Returns typed model objects or throws on error.
-
-ViewModel (StateNotifier)
-    Holds the feature's state (loading, success, failure, data).
-    Calls repository methods and updates state accordingly.
-    Exposes methods the UI calls directly.
-
-Provider
-    Wires the repository and view model together.
-    Consumed by ConsumerWidget or ConsumerStatefulWidget in the UI layer.
+mind_edge/
+├── android/                          ← Native Android project
+├── ios/                              ← Native iOS project
+├── assets/
+│   ├── icon/                         ← App icons
+│   └── rive/                         ← Rive animation files
+├── lib/
+│   ├── main.dart                     ← Entry point, Hive init, runApp
+│   │
+│   ├── core/
+│   │   ├── api_endpoints.dart        ← All backend URLs + storage keys
+│   │   ├── app_router.dart           ← Centralized named routes
+│   │   ├── token_storage.dart        ← Secure JWT storage wrapper
+│   │   ├── errors/
+│   │   │   ├── app_exception.dart
+│   │   │   └── dio_error_handler.dart
+│   │   └── network/
+│   │       ├── dio_client.dart
+│   │       └── dio_interceptors.dart
+│   │
+│   ├── features/
+│   │   ├── auth/
+│   │   │   ├── auth_models.dart
+│   │   │   ├── auth_repostiries.dart
+│   │   │   ├── auth_view_model.dart
+│   │   │   └── auth_providers.dart
+│   │   │
+│   │   ├── files/
+│   │   │   ├── models/file_model.dart
+│   │   │   ├── repositories/files_repository.dart
+│   │   │   └── providers/files_provider.dart
+│   │   │
+│   │   ├── library/
+│   │   │   ├── models/folder_model.dart
+│   │   │   ├── repositories/library_folder_repository.dart
+│   │   │   └── providers/library_folder_providers.dart
+│   │   │
+│   │   └── analysis/
+│   │       ├── model/
+│   │       │   ├── analysis_models.dart
+│   │       │   ├── chat_models.dart
+│   │       │   ├── quiz_models.dart
+│   │       │   └── study_plan_models.dart
+│   │       ├── repository/
+│   │       │   ├── analysis_repository.dart
+│   │       │   ├── chat_repository.dart
+│   │       │   ├── quiz_repository.dart
+│   │       │   └── study_plan_repository.dart
+│   │       └── providers/
+│   │           ├── analysis_providersl.dart
+│   │           ├── chat_providers.dart
+│   │           ├── quiz_providers.dart
+│   │           └── study_plan_provider.dart
+│   │
+│   ├── screens/                      ← All UI screens (auth, dashboard,
+│   │                                   library, upload, scan, OCR,
+│   │                                   AI analysis, AI chat, quiz,
+│   │                                   study plan, audio, settings, …)
+│   │
+│   ├── widgets/                      ← Reusable UI components &
+│   │                                   animation helpers
+│   │
+│   └── theme/
+│       ├── design_tokens.dart        ← Colors, spacing, typography
+│       └── theme.dart                ← MaterialApp ThemeData
+│
+├── pubspec.yaml
+└── README.md
 ```
-
-This separation ensures the UI contains no business logic and all state transitions are testable in isolation.
-
----
-
-## Design System
-
-The visual design is defined entirely in `design_tokens.dart` and follows a warm academic aesthetic:
-
-- **Color Palette:** Parchment cream backgrounds, cocoa browns, and antique gold accents.
-- **Typography:** Syne (headings and titles), DM Sans (body and UI text), DM Mono (extracted text and code blocks).
-- **Gradients:** Warm cream-to-amber background gradients, gold-cocoa CTA button gradients.
-- **Shadows:** Layered soft shadows using `BoxShadow` to create depth without harsh contrast.
-- **Motion:** Fade transitions between routes (280ms), animated containers for state changes.
 
 ---
 
@@ -281,36 +222,220 @@ The visual design is defined entirely in `design_tokens.dart` and follows a warm
 
 ### Prerequisites
 
-- Flutter SDK 3.0 or higher
-- Dart SDK 3.0 or higher
-- Android Studio or Xcode for device/emulator targets
+| Tool | Version |
+| --- | --- |
+| Flutter SDK | 3.3 or newer |
+| Dart | bundled with Flutter |
+| Android Studio / Xcode | for emulators / device builds |
+| VS Code (recommended) | with **Dart** and **Flutter** extensions |
 
-### Installation
+Verify your installation:
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/mindedge-flutter.git
-cd mindedge-flutter
-
-# Install dependencies
-flutter pub get
-
-# Run on a connected device or emulator
-flutter run
+flutter doctor
 ```
 
-### Build
+### 1. Clone the repository
 
 ```bash
-# Android APK
-flutter build apk --release
+git clone <repository-url>
+cd mind_edge
+```
 
-# iOS
+### 2. Install dependencies
+
+```bash
+flutter pub get
+```
+
+### 3. Run the app
+
+```bash
+# List available devices
+flutter devices
+
+# Run on the default device
+flutter run
+
+# Or pick a specific device
+flutter run -d <device-id>
+```
+
+In VS Code you can also press **F5** to start debugging.
+
+---
+
+## Configuration
+
+### Backend Base URL
+
+All backend URLs live in a single file. Open [lib/core/api_endpoints.dart](lib/core/api_endpoints.dart) and update:
+
+```dart
+const String kBaseUrl = 'https://midedge.runasp.net';
+```
+
+Endpoints are grouped per feature (`AuthEndpoints`, `FileEndpoints`, `DocumentEndpoints`, `QuizEndpoints`, `StudyPlanEndpoints`). To change a path, edit the constant — no other code change is required.
+
+### Android Permissions
+
+`android/app/src/main/AndroidManifest.xml` must declare (above `<application>`):
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+```
+
+### iOS Permissions
+
+Add the following keys to `ios/Runner/Info.plist`:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>MindEdge uses the camera to scan study materials.</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>MindEdge needs photo access to import documents.</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>MindEdge uses the microphone for audio features.</string>
+```
+
+### App Icon
+
+Launcher icons are generated from `assets/icon/Icon_app.png` via:
+
+```bash
+flutter pub run flutter_launcher_icons
+```
+
+---
+
+## API Endpoints
+
+A summary of the endpoints consumed by the client (full list in [lib/core/api_endpoints.dart](lib/core/api_endpoints.dart)):
+
+**Auth** — `/api/Auth/`
+- `register`, `login`, `logout`, `me`
+- `verify-email`, `resend-otp`
+- `forgot-password`, `reset-password`, `change-password`
+- `refresh-token`
+
+**Files** — `/api/File/`
+- `Upload`, `Download`, `ListFiles`
+
+**Document Analysis** — `/Document/` and `/documents/`
+- `analyze`, `summary`, `get-rules`, `get-definitions`
+- `documents/upload`, `documents/{id}`
+
+**Quizzes** — `/quizzes/`
+- `generate`, `{id}/submit`, `{id}/results`
+
+**Study Plans** — `/study-plans/`
+- `create`, `getAll`, `{id}`
+
+Interactive API docs (Swagger): `https://midedge.runasp.net/swagger/index.html`
+
+---
+
+## Authentication Flow
+
+1. On launch, **SplashScreen** asks `TokenStorage` for a stored access token.
+2. If a valid token exists → navigate to **Dashboard**.
+3. Otherwise → **Onboarding** → **Sign In** / **Sign Up**.
+4. Sign Up triggers an OTP email; the user verifies via **VerifyEmailScreen**.
+5. The Dio auth interceptor attaches `Authorization: Bearer <token>` to every request.
+6. On `401`, the refresh interceptor calls `/api/Auth/refresh-token` and retries the original request transparently.
+7. `Forgot Password` flow: email → OTP code → new password → success → sign in.
+
+Tokens are persisted using `flutter_secure_storage` (Keychain on iOS, EncryptedSharedPreferences on Android).
+
+---
+
+## State Management
+
+The app uses **Riverpod** providers exclusively:
+
+- `authProvider` / `currentUserProvider` — session and profile.
+- `filesProvider` — uploaded files cache.
+- `libraryFolderProvider` — Hive-backed folder tree.
+- `analysisProvider`, `chatProvider`, `quizProvider`, `studyPlanProvider` — feature notifiers that wrap their respective repositories.
+
+All async state is exposed as `AsyncValue<T>` so the UI can render loading / data / error cleanly with `.when(...)`.
+
+---
+
+## Local Storage
+
+| Purpose | Mechanism |
+| --- | --- |
+| Access & refresh tokens, user blob | `flutter_secure_storage` |
+| Library folders (offline-first) | `Hive` box `kFoldersBoxName` (opened in `main.dart`) |
+| Downloaded files / cached docs | `path_provider` app documents directory |
+
+---
+
+## Building for Release
+
+### Android (APK)
+
+```bash
+flutter build apk --release
+```
+
+Output: `build/app/outputs/flutter-apk/app-release.apk`
+
+### Android (App Bundle for Play Store)
+
+```bash
+flutter build appbundle --release
+```
+
+### iOS
+
+```bash
 flutter build ios --release
 ```
+
+Then archive and upload via Xcode.
+
+> Remember to bump the version in `pubspec.yaml` (`version: 1.0.0+1` → `1.0.1+2` …) before each release build.
+
+---
+
+## Troubleshooting
+
+**`flutter pub get` fails or dependencies clash**
+```bash
+flutter clean
+flutter pub get
+```
+
+**App can't reach the backend on Android**
+- Confirm `INTERNET` permission in `AndroidManifest.xml`.
+- If you target a local backend (HTTP), add a `network_security_config.xml` and reference it via `android:networkSecurityConfig`.
+
+**Camera or storage permissions denied**
+- Re-check `Info.plist` (iOS) and `AndroidManifest.xml` (Android).
+- Reset permissions in the OS settings and reinstall the app.
+
+**Hive box errors after model changes**
+- Delete the app's data or uninstall/reinstall to drop incompatible Hive boxes.
+
+**OTP / email never arrives**
+- Verify the account email is correct and check spam.
+- Use `resend-otp` from the Verify Email screen.
 
 ---
 
 ## License
 
-This project is submitted as a graduation project. All rights reserved.
+This project was developed as a **graduation project** for educational purposes. All rights reserved by the project authors.
+
+---
+
+## Acknowledgements
+
+- The Flutter and Dart teams.
+- The Riverpod, Dio, Hive, and Rive open-source communities.
+- Our supervisors and the Faculty of Computers and Artificial Intelligence.
