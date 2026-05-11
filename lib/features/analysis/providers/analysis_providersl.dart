@@ -4,9 +4,7 @@ import '../model/analysis_models.dart';
 import '../repository/analysis_repository.dart';
 import '../../auth/auth_view_model.dart';
 
-// ─────────────────────────────────────────────────────────────
-// PROVIDERS
-// ─────────────────────────────────────────────────────────────
+
 final analysisRepoProvider = Provider<AnalysisRepository>(
   (ref) => AnalysisRepository(client: ref.watch(dioClientProvider)),
 );
@@ -18,10 +16,6 @@ final analysisViewModelProvider =
     return AnalysisViewModel(repo: repo, fileName: fileName);
   },
 );
-
-// ─────────────────────────────────────────────────────────────
-// VIEW-MODEL
-// ─────────────────────────────────────────────────────────────
 class AnalysisViewModel extends StateNotifier<AnalysisState> {
   final AnalysisRepository _repo;
   final String _fileName;

@@ -14,15 +14,16 @@ import '../screens/forgot_password_success.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/scan_screen.dart';
 import '../screens/ocr_processing_screen.dart';
-import '../screens/ai_result_screen.dart';
 import '../screens/study_plan_screen.dart';
 import '../screens/audio_screen.dart';
 import '../screens/quiz_screen.dart';
 import '../screens/quiz_result_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/library_screen.dart';
+import '../screens/upload_screen.dart';
 import '../screens/ai_analysis_screen.dart';
-import '../screens/ai_chat_screen.dart'; // ← NEW
+import '../screens/ai_chat_screen.dart';
+import '../screens/plans_screen.dart';
 import '../features/analysis/model/quiz_models.dart';
 
 class AppRouter {
@@ -80,12 +81,25 @@ class AppRouter {
         page = const LibraryScreen();
         break;
       case '/study-plan':
-        page = const StudyPlanScreen();
+        final args = s.arguments as Map<String, dynamic>? ?? {};
+        page = StudyPlanScreen(
+          filename: args['filename'] as String?,
+        );
         break;
       case '/scan':
         page = const ScanScreen();
         break;
 
+      case '/plans':
+        page = const PlansScreen();
+        break;
+
+      // ── Upload screen (entry point for AI analysis)
+      case '/upload':
+        page = const UploadScreen();
+        break;
+
+      // ── AI Analysis (requires a file — always comes from /upload)
       case '/ai-analysis':
         final raw = s.arguments;
         String? filePath;
@@ -97,11 +111,16 @@ class AppRouter {
           filePath = raw['filePath'] as String?;
           fileName = raw['fileName'] as String?;
         }
-        page = AIAnalysisScreen(
-          file: filePath != null ? File(filePath) : null,
-          displayName: fileName ?? filePath?.split('/').last,
-        );
+        if (filePath == null) {
+          page = const UploadScreen();
+        } else {
+          page = AIAnalysisScreen(
+            file: File(filePath),
+            displayName: fileName ?? filePath.split('/').last,
+          );
+        }
         break;
+
       case '/ai-chat':
         final args = s.arguments as Map<String, dynamic>? ?? {};
         page = AIChatScreen(
@@ -119,9 +138,6 @@ class AppRouter {
         break;
       case '/ocr-processing':
         page = const OcrProcessingScreen();
-        break;
-      case '/ai-result':
-        page = const AiResultScreen();
         break;
       case '/quiz':
         final args = s.arguments as Map<String, dynamic>? ?? {};
@@ -141,6 +157,7 @@ class AppRouter {
       default:
         page = null;
     }
+
     if (page == null) return null;
     return PageRouteBuilder(
       settings: s,

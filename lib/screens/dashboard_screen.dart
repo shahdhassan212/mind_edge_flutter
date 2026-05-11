@@ -5,46 +5,38 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/dashboard_widgets.dart';
+import '../widgets/robot_widget.dart';
 import '../features/auth/auth_providers.dart';
+import '../features/analysis/model/study_plan_models.dart';
+import '../features/analysis/providers/study_plan_provider.dart';
 
-// ── Study progress state (mock until study-plan endpoint is ready) ─
-class StudyProgress {
-  final String planTitle;
-  final String planSubtitle;
-  final double completionPct;
-  final String completionLabel;
-  final int daysLeft;
-
-  const StudyProgress({
-    required this.planTitle,
-    required this.planSubtitle,
-    required this.completionPct,
-    required this.completionLabel,
-    required this.daysLeft,
-  });
-}
-
-final studyProgressProvider = StateProvider<StudyProgress>(
-  (_) => const StudyProgress(
-    planTitle: 'Organic Chemistry\nFinal Prep',
-    planSubtitle: '4-week intensive · 2h/day · Intermediate',
-    completionPct: 0.68,
-    completionLabel: '68% Complete',
-    daysLeft: 9,
-  ),
-);
-
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(studyPlanProvider.notifier).fetchDashboard();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final firstName = ref.watch(currentUserProvider).when(
           data: (u) => u?.firstName ?? 'there',
           loading: () => '…',
           error: (_, __) => 'there',
         );
-    final progress = ref.watch(studyProgressProvider);
+
+    final planState = ref.watch(studyPlanProvider);
+    final hasPlan = planState.hasPlan;
+    final tasks = planState.dashboardTasks.take(3).toList();
 
     return Scaffold(
       backgroundColor: AppColors.dashBgTop,
@@ -64,7 +56,6 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
         child: Stack(children: [
-          // Subtle top-right glow
           Positioned(
             top: -60,
             right: -60,
@@ -96,7 +87,7 @@ class DashboardScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Monday, Oct 24 · Week 2 of 4',
+                          'Monday, Oct 24',
                           style: TextStyle(
                             fontFamily: 'DM Sans',
                             fontSize: 11,
@@ -124,7 +115,28 @@ class DashboardScreen extends ConsumerWidget {
                       ],
                     ),
                     const Spacer(),
-                    const DashBellBtn(),
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/settings'),
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: AppColors.dashGoldLight.withValues(alpha: 0.2)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.dashTextDark.withValues(alpha: 0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.settings_outlined,
+                            size: 20, color: AppColors.dashTextDark),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -133,179 +145,122 @@ class DashboardScreen extends ConsumerWidget {
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Column(children: [
-                    // ── Hero card — Active Plan
-                    GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, '/study-plan'),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.dashHeroCard,
-                            borderRadius: BorderRadius.circular(22),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.dashHeroCard.withValues(alpha: 0.50),
-                                blurRadius: 40,
-                                offset: const Offset(0, 14),
-                              ),
-                            ],
+
+                    // ── NO PLAN
+                    if (!hasPlan) ...[
+                      const SizedBox(height: 32),
+                      const MainRobot(),
+                      const SizedBox(height: 20),
+                      Text.rich(
+                        TextSpan(
+                          text: "Let's push to the\n",
+                          style: TextStyle(
+                            fontFamily: 'Syne',
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.dashTextDark,
+                            height: 1.25,
                           ),
-                          child: Stack(
-                            clipBehavior: Clip.hardEdge,
-                            children: [
-                              // Decorative circle
-                              Positioned(
-                                top: -35,
-                                right: -35,
-                                child: Container(
-                                  width: 150,
-                                  height: 150,
-                                  decoration: const BoxDecoration(
-                                      shape: BoxShape.circle, color: AppColors.dashHeroCircle),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // "Active Plan" badge
-                                    Container(
-                                      padding:
-                                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.dashBadgeBg,
-                                        border: Border.all(color: AppColors.dashBadgeBorder),
-                                        borderRadius: BorderRadius.circular(100),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text('▶',
-                                              style:
-                                                  TextStyle(fontSize: 9, color: Color(0xFFD4A84B))),
-                                          SizedBox(width: 5),
-                                          Text('Active Plan',
-                                              style: TextStyle(
-                                                fontFamily: 'DM Sans',
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w600,
-                                                color: Color(0xFFD4A84B),
-                                                letterSpacing: 0.3,
-                                              )),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-
-                                    Text(
-                                      progress.planTitle,
-                                      style: const TextStyle(
-                                        fontFamily: 'Syne',
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                        letterSpacing: -0.3,
-                                        height: 1.22,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-
-                                    Text(
-                                      progress.planSubtitle,
-                                      style: TextStyle(
-                                        fontFamily: 'DM Sans',
-                                        fontSize: 12,
-                                        color: Colors.white.withValues(alpha: 0.50),
-                                        fontWeight: FontWeight.w300,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 14),
-
-                                    // Progress bar
-                                    Stack(children: [
-                                      Container(
-                                        height: 4,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.20),
-                                          borderRadius: BorderRadius.circular(2),
-                                        ),
-                                      ),
-                                      FractionallySizedBox(
-                                        widthFactor: progress.completionPct,
-                                        child: Container(
-                                          height: 4,
-                                          decoration: BoxDecoration(
-                                            gradient: const LinearGradient(colors: [
-                                              AppColors.dashGoldDark,
-                                              AppColors.dashGoldLight,
-                                            ]),
-                                            borderRadius: BorderRadius.circular(2),
-                                          ),
-                                        ),
-                                      ),
-                                    ]),
-                                    const SizedBox(height: 8),
-
-                                    // Label + Resume button
-                                    Row(children: [
-                                      Text(
-                                        '${progress.completionLabel} · ${progress.daysLeft} days left',
-                                        style: const TextStyle(
-                                          fontFamily: 'DM Sans',
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.dashGoldLight,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      Container(
-                                        padding:
-                                            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.dashResumeBtn,
-                                          border: Border.all(
-                                              color: AppColors.dashResumeBorder, width: 1.5),
-                                          borderRadius: BorderRadius.circular(100),
-                                        ),
-                                        child: const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text('▶',
-                                                style: TextStyle(fontSize: 9, color: Colors.white)),
-                                            SizedBox(width: 5),
-                                            Text('Resume',
-                                                style: TextStyle(
-                                                  fontFamily: 'DM Sans',
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.white,
-                                                )),
-                                          ],
-                                        ),
-                                      ),
-                                    ]),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          children: [
+                            TextSpan(
+                              text: 'max! ',
+                              style: TextStyle(color: AppColors.dashNameAmber),
+                            ),
+                            const TextSpan(text: '🚀'),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Text(
+                          "Your journey starts now. Set up a plan and we'll guide you every step of the way.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 13,
+                            color: AppColors.dashTextMuted,
+                            fontWeight: FontWeight.w300,
+                            height: 1.5,
                           ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 28),
+                    ],
 
-                    // ── Stats row
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-                      child: Row(children: [
-                        const DashStatTile(value: '12', label: 'Sessions'),
-                        const SizedBox(width: 8),
-                        const DashStatTile(value: '24h', label: 'Studied', valueFontSize: 16),
-                        const SizedBox(width: 8),
-                        DashStatTile(
-                            value: '🔥7', label: 'Streak', valueColor: AppColors.dashTextDark),
-                      ]),
-                    ),
+                    // ── HAS PLAN
+                    if (hasPlan) ...[
+                      // Robot + motivation strip
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                                color: AppColors.dashGoldLight.withValues(alpha: 0.2)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.dashTextDark.withValues(alpha: 0.05),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(children: [
+                            const SizedBox(
+                              width: 72,
+                              height: 84,
+                              child: FittedBox(
+                                fit: BoxFit.contain,
+                                child: MainRobot(),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "You're on fire! 🔥",
+                                    style: TextStyle(
+                                      fontFamily: 'Syne',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.dashTextDark,
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'Keep crushing it!',
+                                    style: TextStyle(
+                                      fontFamily: 'Syne',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.dashTextDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${tasks.where((t) => t.isCompleted).length} of ${planState.dashboardTasks.length} tasks done',
+                                    style: TextStyle(
+                                      fontFamily: 'DM Sans',
+                                      fontSize: 11.5,
+                                      color: AppColors.dashTextMuted,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
 
                     // ── Today's Tasks header
                     Padding(
@@ -321,68 +276,103 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                         ),
                         const Spacer(),
-                        Text(
-                          'See all',
-                          style: TextStyle(
-                            fontFamily: 'DM Sans',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.dashNameAmber,
+                        GestureDetector(
+                          onTap: () => Navigator.pushNamed(context, '/plans'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.dashTextDark,
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: const Text(
+                              'View Plans',
+                              style: TextStyle(
+                                fontFamily: 'DM Sans',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                       ]),
                     ),
 
-                    // ── Task list (mock — replace when endpoint ready)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-                      child: Column(children: const [
-                        DashTaskCard(
-                          done: true,
-                          name: 'Review Nucleophilic Substitution',
-                          meta: '30 min · Completed 8:14 AM',
-                        ),
-                        SizedBox(height: 7),
-                        DashTaskCard(
-                          done: false,
-                          name: 'Practice Problems — Ch.9 Reactions',
-                          meta: '45 min · Est. 3:00 PM',
-                        ),
-                        SizedBox(height: 7),
-                        DashTaskCard(
-                          done: false,
-                          name: 'Audio: Carbonyl Chemistry Overview',
-                          meta: '20 min · AI audio explanation',
-                        ),
-                      ]),
-                    ),
-
-                    // ── AI recommendation strip
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-                      child: DashAIStrip(
-                        text: TextSpan(children: [
-                          TextSpan(
-                            text: 'AI Recommendation: ',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600, color: AppColors.dashTextDark),
+                    // ── NO PLAN: empty box
+                    if (!hasPlan)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: AppColors.dashGoldLight.withValues(alpha: 0.3),
+                            ),
                           ),
-                          const TextSpan(
-                            text:
-                                'Schedule extra time on Electrophilic Addition before Friday\'s review.',
-                          ),
-                        ]),
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            const Text('📬', style: TextStyle(fontSize: 36)),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No tasks for today',
+                              style: TextStyle(
+                                fontFamily: 'Syne',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.dashTextDark,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Start a plan to get your daily tasks here',
+                              style: TextStyle(
+                                fontFamily: 'DM Sans',
+                                fontSize: 12,
+                                color: AppColors.dashTextMuted,
+                                fontWeight: FontWeight.w300,
+                              ),
+                            ),
+                          ]),
+                        ),
                       ),
-                    ),
 
-                    // ── Take Quiz button
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-                      child: AppButton(
-                        label: 'Take Quiz  ✦',
-                        onTap: () => Navigator.pushNamed(context, '/quiz'),
+                    // ── HAS PLAN: task list (first 3)
+                    if (hasPlan) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                        child: Column(
+                          children: tasks.asMap().entries.map((e) {
+                            final i = e.key;
+                            final task = e.value;
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: i < tasks.length - 1 ? 7 : 0),
+                              child: DashTaskCard(
+                                taskId: task.id,
+                                done: task.isCompleted,
+                                name: task.taskName,
+                                meta: '${task.duration} · ${task.topicName}',
+                                priority: task.priority,
+                                onToggle: () => ref
+                                    .read(studyPlanProvider.notifier)
+                                    .toggleTask(task.id),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
-                    ),
+
+                      // Take Quiz button
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                        child: AppButton(
+                          label: 'Take Quiz  ✦',
+                          onTap: () => Navigator.pushNamed(context, '/upload'),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 8),
                   ]),
@@ -393,11 +383,9 @@ class DashboardScreen extends ConsumerWidget {
               DashBottomNav(
                 active: 0,
                 onTap: (i) {
-                  if (i == 0) Navigator.pushNamed(context, '/study-plan');
                   if (i == 1) Navigator.pushNamed(context, '/library');
                   if (i == 2) Navigator.pushNamed(context, '/scan');
-                  if (i == 3) Navigator.pushNamed(context, '/ai-analysis');
-                  if (i == 4) Navigator.pushNamed(context, '/settings');
+                  if (i == 3) Navigator.pushNamed(context, '/upload');
                 },
               ),
             ]),

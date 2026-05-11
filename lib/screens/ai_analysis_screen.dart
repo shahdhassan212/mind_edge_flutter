@@ -1,6 +1,5 @@
 // screens/ai_analysis_screen.dart
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/analysis/model/analysis_models.dart';
@@ -10,47 +9,25 @@ import '../widgets/ai_analysis_widgets.dart';
 import '../widgets/common_widgets.dart';
 
 class AIAnalysisScreen extends ConsumerStatefulWidget {
-  final File? file;
+  final File file;
   final String? displayName;
-  const AIAnalysisScreen({super.key, this.file, this.displayName});
+  const AIAnalysisScreen({super.key, required this.file, this.displayName});
 
   @override
   ConsumerState<AIAnalysisScreen> createState() => _AIAnalysisScreenState();
 }
 
 class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
-  String? _fileName;
+  late String _fileName;
   int _tab = 0;
 
   @override
   void initState() {
     super.initState();
-    if (widget.file != null) {
-      _fileName = widget.file!.path.split(RegExp(r'[\\\\/]+')).last;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ref.read(analysisViewModelProvider(_fileName!).notifier).loadAll(widget.file!);
-      });
-    }
-  }
-
-  Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'doc', 'docx', 'png', 'jpg', 'jpeg'],
-      allowMultiple: false,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final picked = result.files.first;
-    if (picked.path == null || !mounted) return;
-    final file = File(picked.path!);
-    setState(() {
-      _fileName = picked.name;
-      _tab = 0;
-    });
+    _fileName = widget.file.path.split(RegExp(r'[\\\\/]+')).last;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(analysisViewModelProvider(_fileName!).notifier).loadAll(file);
+      ref.read(analysisViewModelProvider(_fileName).notifier).loadAll(widget.file);
     });
   }
 
@@ -74,11 +51,9 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
           child: Column(children: [
             AiTopBar(
               onBack: () => Navigator.pop(context),
-              onUpload: _pickFile,
+              onUpload: () => Navigator.pushNamed(context, '/upload'),
             ),
-            Expanded(
-              child: _fileName == null ? _buildEmpty() : _buildAnalysis(),
-            ),
+            Expanded(child: _buildAnalysis()),
             _buildBottomBar(context),
           ]),
         ),
@@ -86,78 +61,16 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
     );
   }
 
-  // ── Empty state ───────────────────────────────────────────────
-  Widget _buildEmpty() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.aiChipBg,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.aiBorderDash, width: 1.5),
-            ),
-            child: const Icon(Icons.upload_file_rounded, size: 36, color: AppColors.aiGoldDark),
-          ),
-          const SizedBox(height: 18),
-          const Text('Upload a document to analyze',
-              style: TextStyle(
-                  fontFamily: 'Syne',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.aiTextDark)),
-          const SizedBox(height: 6),
-          const Text('PDF, DOC, DOCX, PNG, or JPG',
-              style: TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 12,
-                  color: AppColors.aiTextMuted,
-                  fontWeight: FontWeight.w400)),
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: _pickFile,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.aiTextDark,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                      color: AppColors.aiTextDark.withOpacity(0.30),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4))
-                ],
-              ),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                SizedBox(width: 6),
-                Text('Pick a file',
-                    style: TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white)),
-              ]),
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
-
   // ── Analysis view ─────────────────────────────────────────────
   Widget _buildAnalysis() {
-    final state = ref.watch(analysisViewModelProvider(_fileName!));
+    final state = ref.watch(analysisViewModelProvider(_fileName));
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: AiHeroCard(
-            displayName: widget.displayName ?? _fileName ?? '',
+            displayName: widget.displayName ?? _fileName,
             visualStatus: state.visualStatus,
             summaryStatus: state.summaryStatus,
           ),
@@ -202,7 +115,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
           child: AiAskStrip(
             onTap: () => Navigator.pushNamed(context, '/ai-chat', arguments: {
-              'fileName': widget.displayName ?? _fileName ?? '',
+              'fileName': widget.displayName ?? _fileName,
               'sessionId': state.visualData?.sessionId,
             }),
           ),
@@ -222,7 +135,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
 
   // ── Tab 0 — Summary ───────────────────────────────────────────
   Widget _buildSummaryTab(AnalysisState state) {
-    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+    final vm = ref.read(analysisViewModelProvider(_fileName).notifier);
     return AiContentShell(
       label: 'AI Summary',
       child: switch (state.summaryStatus) {
@@ -236,7 +149,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
 
   // ── Tab 1 — Rules ─────────────────────────────────────────────
   Widget _buildRulesTab(AnalysisState state) {
-    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+    final vm = ref.read(analysisViewModelProvider(_fileName).notifier);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -270,14 +183,14 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
 
   // ── Tab 2 — Visual Analysis ───────────────────────────────────
   Widget _buildAnalysisTab(AnalysisState state) {
-    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+    final vm = ref.read(analysisViewModelProvider(_fileName).notifier);
     return AiContentShell(
       label: 'Visual Analysis',
       child: switch (state.visualStatus) {
         LoadStatus.idle || LoadStatus.loading => const AiTextSkeleton(lines: 5),
         LoadStatus.failure => AiErrorRetry(
             message: state.visualError ?? 'Failed to analyze visuals',
-            onRetry: () => vm.retryAll(widget.file!)),
+            onRetry: () => vm.retryAll(widget.file)),
         LoadStatus.success => _VisualAnalysisBody(data: state.visualData!),
       },
     );
@@ -285,7 +198,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
 
   // ── Tab 3 — Definitions ───────────────────────────────────────
   Widget _buildDefinitionsTab(AnalysisState state) {
-    final vm = ref.read(analysisViewModelProvider(_fileName!).notifier);
+    final vm = ref.read(analysisViewModelProvider(_fileName).notifier);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -332,13 +245,10 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
 
   // ── Bottom bar ────────────────────────────────────────────────
   Widget _buildBottomBar(BuildContext context) {
-    final analysisState =
-        _fileName != null ? ref.watch(analysisViewModelProvider(_fileName!)) : null;
-    final summaryData = analysisState?.summaryData;
+    final analysisState = ref.watch(analysisViewModelProvider(_fileName));
+    final summaryData = analysisState.summaryData;
     final audioReady = (summaryData?.audioUrl ?? '').isNotEmpty;
-
-    // documentName is what the server stored the file as — required by quiz API
-    final serverFilename = analysisState?.visualData?.documentName ?? _fileName ?? '';
+    final serverFilename = analysisState.visualData?.documentName ?? _fileName;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
@@ -389,6 +299,28 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
         ),
         const SizedBox(width: 8),
         GestureDetector(
+          onTap: () =>
+              Navigator.pushNamed(context, '/study-plan', arguments: {'filename': serverFilename}),
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.aiTextDark,
+              borderRadius: BorderRadius.circular(13),
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.aiTextDark.withOpacity(0.30),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4))
+              ],
+            ),
+            child: const Center(
+              child: Icon(Icons.calendar_today_rounded, size: 20, color: Colors.white),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
           onTap: () {
             if (!audioReady) {
               AppSnackBar.show(context, 'Audio is still being generated…', isError: false);
@@ -397,7 +329,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
             Navigator.pushNamed(context, '/audio_screen', arguments: {
               'audioUrl': summaryData!.audioUrl,
               'summary': summaryData.summary,
-              'displayName': widget.displayName ?? _fileName ?? summaryData.filename,
+              'displayName': widget.displayName ?? _fileName,
             });
           },
           child: Opacity(

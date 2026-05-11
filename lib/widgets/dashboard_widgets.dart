@@ -83,95 +83,143 @@ class DashStatTile extends StatelessWidget {
       );
 }
 
-// ── Task card (no priority badges) ────────────────────────────
+// ── Task card ──────────────────────────────────────────────────
 class DashTaskCard extends StatelessWidget {
+  final int taskId;
   final bool done;
   final String name;
   final String meta;
+  final String priority;
+  final VoidCallback? onToggle;
 
   const DashTaskCard({
     super.key,
+    required this.taskId,
     required this.done,
     required this.name,
     required this.meta,
+    this.priority = 'medium',
+    this.onToggle,
   });
 
   @override
-  Widget build(BuildContext context) => Opacity(
-        opacity: done ? 0.60 : 1.0,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.dashSurface,
-            border: Border.all(color: AppColors.dashBorder, width: 1.2),
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                  color: AppColors.dashTextDark.withValues(alpha: 0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2))
-            ],
-          ),
-          child: Row(children: [
-            // Checkbox circle
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: done
-                    ? const LinearGradient(
-                        colors: [AppColors.dashTextDark, AppColors.dashGoldDark],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onToggle,
+        child: Opacity(
+          opacity: done ? 0.65 : 1.0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.dashSurface,
+              border: Border.all(color: AppColors.dashBorder, width: 1.2),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.dashTextDark.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2))
+              ],
+            ),
+            child: Row(children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: done
+                      ? const LinearGradient(
+                          colors: [AppColors.dashTextDark, AppColors.dashGoldDark],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  border: done
+                      ? null
+                      : Border.all(
+                          color: AppColors.dashTextMuted.withValues(alpha: 0.50), width: 1.8),
+                  color: done ? null : Colors.white,
+                ),
+                child: done
+                    ? const Center(
+                        child: Text('✓',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.white,
+                                height: 1,
+                                fontWeight: FontWeight.w700)))
                     : null,
-                border: done
-                    ? null
-                    : Border.all(
-                        color: AppColors.dashTextMuted.withValues(alpha: 0.50), width: 1.8),
-                color: done ? null : Colors.white,
               ),
-              child: done
-                  ? const Center(
-                      child: Text('✓',
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.white,
-                              height: 1,
-                              fontWeight: FontWeight.w700)))
-                  : null,
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                    color: done ? AppColors.dashTextMuted : AppColors.dashTextDark,
-                    height: 1.3,
-                    decoration: done ? TextDecoration.lineThrough : null,
-                    decorationColor: AppColors.dashTextMuted,
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: done ? AppColors.dashTextMuted : AppColors.dashTextDark,
+                      height: 1.3,
+                      decoration: done ? TextDecoration.lineThrough : null,
+                      decorationColor: AppColors.dashTextMuted,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  meta,
-                  style: const TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 10,
-                    color: AppColors.dashTextMuted,
-                    fontWeight: FontWeight.w300,
+                  const SizedBox(height: 2),
+                  Text(
+                    meta,
+                    style: const TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 10,
+                      color: AppColors.dashTextMuted,
+                      fontWeight: FontWeight.w300,
+                    ),
                   ),
-                ),
-              ]),
-            ),
-          ]),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              _PriorityBadge(priority: priority),
+            ]),
+          ),
         ),
       );
+}
+
+// ── Priority badge ─────────────────────────────────────────────
+class _PriorityBadge extends StatelessWidget {
+  final String priority;
+  const _PriorityBadge({required this.priority});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg;
+    final Color text;
+    switch (priority.toLowerCase()) {
+      case 'high':
+        bg = const Color(0xFFFFEBEB);
+        text = const Color(0xFFC0392B);
+        break;
+      case 'medium':
+        bg = const Color(0xFFFFF3E0);
+        text = const Color(0xFFE67E22);
+        break;
+      default:
+        bg = const Color(0xFFE8F5E9);
+        text = const Color(0xFF27AE60);
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        priority[0].toUpperCase() + priority.substring(1),
+        style: TextStyle(
+            fontFamily: 'DM Sans', fontSize: 9.5, fontWeight: FontWeight.w600, color: text),
+      ),
+    );
+  }
 }
 
 // ── AI recommendation strip ────────────────────────────────────
@@ -221,6 +269,7 @@ class DashAIStrip extends StatelessWidget {
 }
 
 // ── Bottom nav ─────────────────────────────────────────────────
+// 3 items only: Library | FAB | AI
 class DashBottomNav extends StatelessWidget {
   final int active;
   final void Function(int) onTap;
@@ -229,7 +278,7 @@ class DashBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+      padding: const EdgeInsets.fromLTRB(40, 10, 40, 20),
       decoration: BoxDecoration(
         color: AppColors.dashSurface,
         border: Border(top: BorderSide(color: AppColors.dashNavBorder, width: 1)),
@@ -240,60 +289,82 @@ class DashBottomNav extends StatelessWidget {
               offset: const Offset(0, -3))
         ],
       ),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-        _NavItem(emoji: '🏠', label: 'Plans', on: active == 0, onTap: () => onTap(0)),
-        _NavItem(emoji: '📚', label: 'Library', on: active == 1, onTap: () => onTap(1)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Library
+          _NavItem(
+            icon: Icons.menu_book_rounded,
+            label: 'Library',
+            on: active == 1,
+            onTap: () => onTap(1),
+          ),
 
-        // FAB
-        GestureDetector(
-          onTap: () => onTap(2),
-          child: Container(
-            width: 46,
-            height: 46,
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: AppGradients.ctaButton,
-              boxShadow: [
-                BoxShadow(
-                    color: AppColors.dashTextDark.withValues(alpha: 0.32),
-                    blurRadius: 28,
-                    offset: const Offset(0, 8))
-              ],
-            ),
-            child: const Center(
-              child: Text('＋',
-                  style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.w600)),
+          // FAB — scan/add
+          GestureDetector(
+            onTap: () => onTap(2),
+            child: Container(
+              width: 52,
+              height: 52,
+              margin: const EdgeInsets.only(bottom: 6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.dashTextDark,
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.dashTextDark.withValues(alpha: 0.30),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6))
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.add_rounded, size: 26, color: Colors.white),
+              ),
             ),
           ),
-        ),
 
-        _NavItem(emoji: '🤖', label: 'AI', on: active == 3, onTap: () => onTap(3)),
-        _NavItem(emoji: '⚙', label: 'Settings', on: active == 4, onTap: () => onTap(4)),
-      ]),
+          // AI
+          _NavItem(
+            icon: Icons.smart_toy_rounded,
+            label: 'AI',
+            on: active == 3,
+            onTap: () => onTap(3),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _NavItem extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
   final String label;
   final bool on;
   final VoidCallback onTap;
-  const _NavItem({required this.emoji, required this.label, required this.on, required this.onTap});
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.on,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => GestureDetector(
         onTap: onTap,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(emoji, style: const TextStyle(fontSize: 18)),
+          Icon(
+            icon,
+            size: 22,
+            color: on ? AppColors.dashTextDark : AppColors.dashTextMuted,
+          ),
           const SizedBox(height: 3),
           Text(
             label,
             style: TextStyle(
               fontFamily: 'DM Sans',
               fontSize: 9.5,
-              fontWeight: FontWeight.w500,
+              fontWeight: on ? FontWeight.w600 : FontWeight.w500,
               color: on ? AppColors.dashTextDark : AppColors.dashTextMuted,
               letterSpacing: 0.2,
             ),
