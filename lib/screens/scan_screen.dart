@@ -173,110 +173,110 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             const SizedBox(height: 12),
 
             // ── Camera zone ───────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: Container(
-                  height: 220,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0A0704),
-                    border: Border.all(color: AppColors.gold.withOpacity(0.18), width: 1.5),
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: Stack(children: [
-                    // Live preview
-                    Positioned.fill(child: _buildCameraPreview()),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0A0704),
+                      border: Border.all(color: AppColors.gold.withOpacity(0.18), width: 1.5),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Stack(children: [
+                      // Live preview
+                      Positioned.fill(child: _buildCameraPreview()),
 
-                    // Corner brackets
-                    ..._corners(),
+                      // Corner brackets
+                      ..._corners(),
 
-                    // Scan beam
-                    if (_camReady)
-                      AnimatedBuilder(
-                        animation: _beamAnim,
-                        builder: (_, __) {
-                          final y = 18 + (_beamAnim.value * (220 - 34));
-                          return Positioned(
-                            top: y,
-                            left: 14,
-                            right: 14,
-                            height: 2,
-                            child: Opacity(
-                              opacity: (1 - _beamAnim.value * 0.5),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                    gradient: LinearGradient(colors: [
-                                  Colors.transparent,
-                                  AppColors.gold.withOpacity(0.8),
-                                  Colors.transparent,
-                                ])),
+                      // Scan beam
+                      if (_camReady)
+                        AnimatedBuilder(
+                          animation: _beamAnim,
+                          builder: (context, _) {
+                            return Positioned(
+                              top: 18 + (_beamAnim.value * (MediaQuery.of(context).size.height * 0.4)),
+                              left: 14,
+                              right: 14,
+                              height: 2,
+                              child: Opacity(
+                                opacity: (1 - _beamAnim.value * 0.5),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                      gradient: LinearGradient(colors: [
+                                    Colors.transparent,
+                                    AppColors.gold.withOpacity(0.8),
+                                    Colors.transparent,
+                                  ])),
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-
-                    // OCR badge
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: AppColors.cocoaDeep.withOpacity(0.75),
-                          border: Border.all(color: AppColors.gold.withOpacity(0.3)),
-                          borderRadius: BorderRadius.circular(100),
+                            );
+                          },
                         ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          _PulsingDot(),
-                          const SizedBox(width: 5),
-                          Text(
-                            _camReady ? 'OCR Active' : 'Initializing…',
-                            style: const TextStyle(
-                                fontFamily: 'DM Sans',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.goldLight,
-                                letterSpacing: 0.6),
-                          ),
-                        ]),
-                      ),
-                    ),
 
-                    // Bottom bar
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.fromLTRB(14, 18, 14, 10),
-                        decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
-                                colors: [
-                              Color(0xD90A0704),
-                              Colors.transparent,
-                            ])),
-                        child: Row(children: [
-                          Text('Detection confidence',
-                              style: TextStyle(
+                      // OCR badge
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.cocoaDeep.withOpacity(0.75),
+                            border: Border.all(color: AppColors.gold.withOpacity(0.3)),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            _PulsingDot(),
+                            const SizedBox(width: 5),
+                            Text(
+                              _camReady ? 'OCR Active' : 'Initializing…',
+                              style: const TextStyle(
                                   fontFamily: 'DM Sans',
-                                  fontSize: 11,
-                                  color: AppColors.white.withOpacity(0.7),
-                                  fontWeight: FontWeight.w300)),
-                          const Spacer(),
-                          const Text('98.4%',
-                              style: TextStyle(
-                                  fontFamily: 'Syne',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.goldLight)),
-                        ]),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.goldLight,
+                                  letterSpacing: 0.6),
+                            ),
+                          ]),
+                        ),
                       ),
-                    ),
-                  ]),
+
+                      // Bottom bar
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(14, 18, 14, 10),
+                          decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [
+                                Color(0xD90A0704),
+                                Colors.transparent,
+                              ])),
+                          child: Row(children: [
+                            Text('Detection confidence',
+                                style: TextStyle(
+                                    fontFamily: 'DM Sans',
+                                    fontSize: 11,
+                                    color: AppColors.white.withOpacity(0.7),
+                                    fontWeight: FontWeight.w300)),
+                            const Spacer(),
+                            const Text('98.4%',
+                                style: TextStyle(
+                                    fontFamily: 'Syne',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.goldLight)),
+                          ]),
+                        ),
+                      ),
+                    ]),
+                  ),
                 ),
               ),
             ),
@@ -438,7 +438,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     );
   }
 
-  // ── Camera preview / states ───────────────────────────────
   Widget _buildCameraPreview() {
     if (_camError != null) {
       return GestureDetector(
@@ -491,7 +490,19 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       );
     }
 
-    return CameraPreview(_camCtrl!);
+    final controller = _camCtrl!;
+    final size = MediaQuery.of(context).size;
+    var scale = size.aspectRatio * controller.value.aspectRatio;
+
+    // to prevent image stretching
+    if (scale < 1) scale = 1 / scale;
+
+    return Transform.scale(
+      scale: scale,
+      child: Center(
+        child: CameraPreview(controller),
+      ),
+    );
   }
 
   List<Widget> _corners() {

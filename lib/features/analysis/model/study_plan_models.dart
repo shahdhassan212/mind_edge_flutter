@@ -37,11 +37,20 @@ class StudyTask {
     required this.studyDayId,
   });
 
+  StudyTask copyWith({bool? isCompleted}) => StudyTask(
+        id: id,
+        taskName: taskName,
+        duration: duration,
+        priority: priority,
+        isCompleted: isCompleted ?? this.isCompleted,
+        studyDayId: studyDayId,
+      );
+
   factory StudyTask.fromJson(Map<String, dynamic> j) => StudyTask(
-        id: j['id'] as int,
-        taskName: j['taskName']?.toString() ?? '',
-        duration: j['duration']?.toString() ?? '',
-        priority: j['priority']?.toString() ?? 'medium',
+        id: (j['id'] ?? 0) as int,
+        taskName: (j['taskName'] ?? j['name'] ?? j['title'] ?? '').toString(),
+        duration: (j['duration'] ?? '').toString(),
+        priority: (j['priority'] ?? 'medium').toString(),
         isCompleted: j['isCompleted'] as bool? ?? false,
         studyDayId: j['studyDayId'] as int? ?? 0,
       );
@@ -61,14 +70,24 @@ class StudyDay {
     required this.tasks,
   });
 
-  factory StudyDay.fromJson(Map<String, dynamic> j) => StudyDay(
-        id: j['id'] as int,
-        dayNumber: j['dayNumber'] as int,
-        topic: j['topic']?.toString() ?? '',
-        tasks: (j['tasks'] as List<dynamic>? ?? [])
-            .map((t) => StudyTask.fromJson(t as Map<String, dynamic>))
-            .toList(),
+  StudyDay copyWith({List<StudyTask>? tasks}) => StudyDay(
+        id: id,
+        dayNumber: dayNumber,
+        topic: topic,
+        tasks: tasks ?? this.tasks,
       );
+
+  factory StudyDay.fromJson(Map<String, dynamic> j) {
+    final taskList = (j['tasks'] ?? j['studyTasks'] ?? []) as List<dynamic>;
+    return StudyDay(
+      id: (j['id'] ?? 0) as int,
+      dayNumber: (j['dayNumber'] ?? 0) as int,
+      topic: (j['topic'] ?? j['title'] ?? '').toString(),
+      tasks: taskList
+          .map((t) => StudyTask.fromJson(t as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }
 
 // ── Generate response ─────────────────────────────────────────
@@ -85,17 +104,26 @@ class StudyPlanResponse {
     required this.days,
   });
 
+  StudyPlanResponse copyWith({List<StudyDay>? days}) => StudyPlanResponse(
+        id: id,
+        fileName: fileName,
+        createdAt: createdAt,
+        days: days ?? this.days,
+      );
+
   int get totalTasks => days.fold(0, (sum, d) => sum + d.tasks.length);
 
-  factory StudyPlanResponse.fromJson(Map<String, dynamic> j) =>
-      StudyPlanResponse(
-        id: j['id'] as int,
-        fileName: j['fileName']?.toString() ?? '',
-        createdAt: j['createdAt']?.toString() ?? '',
-        days: (j['days'] as List<dynamic>? ?? [])
-            .map((d) => StudyDay.fromJson(d as Map<String, dynamic>))
-            .toList(),
-      );
+  factory StudyPlanResponse.fromJson(Map<String, dynamic> j) {
+    final dayList = (j['days'] ?? j['studyDays'] ?? []) as List<dynamic>;
+    return StudyPlanResponse(
+      id: (j['id'] ?? 0) as int,
+      fileName: (j['fileName'] ?? '').toString(),
+      createdAt: (j['createdAt'] ?? '').toString(),
+      days: dayList
+          .map((d) => StudyDay.fromJson(d as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }
 
 // ── Dashboard task ────────────────────────────────────────────
@@ -107,6 +135,7 @@ class DashboardTask {
   final String fileName;
   final String topicName;
   final bool isCompleted;
+  final DateTime? completedAt;
 
   const DashboardTask({
     required this.id,
@@ -116,6 +145,7 @@ class DashboardTask {
     required this.fileName,
     required this.topicName,
     this.isCompleted = false,
+    this.completedAt,
   });
 
   factory DashboardTask.fromJson(Map<String, dynamic> j) => DashboardTask(
@@ -126,9 +156,13 @@ class DashboardTask {
         fileName: j['fileName']?.toString() ?? '',
         topicName: j['topicName']?.toString() ?? '',
         isCompleted: j['isCompleted'] as bool? ?? false,
+        completedAt: j['completedAt'] != null
+            ? DateTime.parse(j['completedAt'] as String)
+            : null,
       );
 
-  DashboardTask copyWith({bool? isCompleted}) => DashboardTask(
+  DashboardTask copyWith({bool? isCompleted, DateTime? completedAt}) =>
+      DashboardTask(
         id: id,
         taskName: taskName,
         priority: priority,
@@ -136,6 +170,7 @@ class DashboardTask {
         fileName: fileName,
         topicName: topicName,
         isCompleted: isCompleted ?? this.isCompleted,
+        completedAt: completedAt ?? this.completedAt,
       );
 }
 

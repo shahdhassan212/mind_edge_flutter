@@ -2,30 +2,18 @@
 
 import 'package:dio/dio.dart';
 import '../models/file_model.dart';
+import '../../../core/network/dio_client.dart';
 
 class FilesRepository {
-  final Dio _dio;
+  final DioClient _client;
 
-  FilesRepository({Dio? dio})
-      : _dio = dio ??
-            Dio(BaseOptions(
-              baseUrl: 'https://midedge.runasp.net',
-              headers: {'accept': '*/*'},
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 15),
-            ));
+  FilesRepository({DioClient? client}) : _client = client ?? DioClient();
 
   // ── GET /api/File/ListFiles ──────────────────────────────
   Future<List<LibFile>> fetchFiles() async {
-    final resp = await _dio.get<Map<String, dynamic>>('/api/File/ListFiles');
+    final resp = await _client.get<Map<String, dynamic>>('/api/File/ListFiles');
 
-    if (resp.statusCode != 200) {
-      throw Exception('Server returned ${resp.statusCode}');
-    }
-
-    final raw = (resp.data!['files'] as List<dynamic>? ?? [])
-        .map((e) => e.toString())
-        .toList();
+    final raw = (resp.data!['files'] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
 
     return raw.map(LibFile.fromString).toList();
   }
@@ -42,13 +30,9 @@ class FilesRepository {
       ),
     });
 
-    final resp = await _dio.post<dynamic>(
+    final resp = await _client.post<dynamic>(
       '/api/File/Upload',
       data: formData,
-      options: Options(
-        sendTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-      ),
     );
 
     return resp.statusCode == 200 || resp.statusCode == 201;

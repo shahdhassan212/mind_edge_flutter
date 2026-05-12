@@ -138,9 +138,7 @@ class _PlanCard extends StatefulWidget {
 class _PlanCardState extends State<_PlanCard> {
   bool _expanded = false;
 
-  bool get _isThisPlan =>
-      widget.selectedPlan?.fileName == widget.item.fileName &&
-      widget.selectedPlan?.id == widget.item.id;
+  bool get _isThisPlan => widget.selectedPlan?.fileName == widget.item.fileName;
 
   @override
   Widget build(BuildContext context) {
@@ -159,8 +157,9 @@ class _PlanCardState extends State<_PlanCard> {
         // Header
         GestureDetector(
           onTap: () {
-            setState(() => _expanded = !_expanded);
-            if (!_expanded) widget.onTap();
+            final nextExpanded = !_expanded;
+            setState(() => _expanded = nextExpanded);
+            if (nextExpanded) widget.onTap();
           },
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -214,18 +213,28 @@ class _PlanCardState extends State<_PlanCard> {
         // Expanded content
         if (_expanded) ...[
           Divider(height: 1, color: const Color(0xFFB48C50).withOpacity(0.1)),
-          if (widget.selectedPlanStatus == StudyPlanStatus.loading &&
-              !_isThisPlan)
+          if (widget.selectedPlanStatus == StudyPlanStatus.loading)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: CircularProgressIndicator(color: AppColors.gold),
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.gold,
+                  strokeWidth: 2.5,
+                ),
+              ),
             )
           else if (_isThisPlan && widget.selectedPlan != null)
             _buildDays(widget.selectedPlan!)
+          else if (widget.selectedPlanStatus == StudyPlanStatus.failure)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Text('Failed to load tasks',
+                  style: TextStyle(fontFamily: 'DM Sans', color: Colors.red)),
+            )
           else
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text('Tap to load plan details',
+              child: Text('Loading plan details...',
                   style: TextStyle(
                       fontFamily: 'DM Sans',
                       fontSize: 12,
@@ -237,6 +246,14 @@ class _PlanCardState extends State<_PlanCard> {
   }
 
   Widget _buildDays(StudyPlanResponse plan) {
+    if (plan.days.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text('No lectures found for this plan',
+            style: TextStyle(fontFamily: 'DM Sans', color: AppColors.muted)),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Column(
@@ -257,7 +274,7 @@ class _PlanCardState extends State<_PlanCard> {
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
-                      'Day ${day.dayNumber}',
+                      'Lecture ${day.dayNumber}',
                       style: const TextStyle(
                           fontFamily: 'DM Sans',
                           fontSize: 10,
@@ -281,61 +298,70 @@ class _PlanCardState extends State<_PlanCard> {
                 const SizedBox(height: 8),
 
                 // Tasks
-                ...day.tasks.map((task) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: GestureDetector(
-                        onTap: () => widget.onToggle(task.id),
-                        child: Row(children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: task.isCompleted
-                                  ? const LinearGradient(colors: [
-                                      AppColors.dashTextDark,
-                                      AppColors.gold
-                                    ])
+                if (day.tasks.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 28, bottom: 8),
+                    child: Text('No tasks for this lecture',
+                        style: TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 11,
+                            color: AppColors.muted)),
+                  )
+                else
+                  ...day.tasks.map((task) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: GestureDetector(
+                          onTap: () => widget.onToggle(task.id),
+                          child: Row(children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: task.isCompleted
+                                    ? const LinearGradient(colors: [
+                                        AppColors.dashTextDark,
+                                        AppColors.gold
+                                      ])
+                                    : null,
+                                border: task.isCompleted
+                                    ? null
+                                    : Border.all(
+                                        color: AppColors.muted.withOpacity(0.4),
+                                        width: 1.5),
+                                color: task.isCompleted ? null : Colors.white,
+                              ),
+                              child: task.isCompleted
+                                  ? const Center(
+                                      child: Text('✓',
+                                          style: TextStyle(
+                                              fontSize: 9,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700)))
                                   : null,
-                              border: task.isCompleted
-                                  ? null
-                                  : Border.all(
-                                      color: AppColors.muted.withOpacity(0.4),
-                                      width: 1.5),
-                              color:
-                                  task.isCompleted ? null : Colors.white,
                             ),
-                            child: task.isCompleted
-                                ? const Center(
-                                    child: Text('✓',
-                                        style: TextStyle(
-                                            fontSize: 9,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700)))
-                                : null,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              task.taskName,
-                              style: TextStyle(
-                                  fontFamily: 'DM Sans',
-                                  fontSize: 12,
-                                  color: task.isCompleted
-                                      ? AppColors.muted
-                                      : AppColors.cocoaDeep,
-                                  decoration: task.isCompleted
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                  decorationColor: AppColors.muted),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                task.taskName,
+                                style: TextStyle(
+                                    fontFamily: 'DM Sans',
+                                    fontSize: 12,
+                                    color: task.isCompleted
+                                        ? AppColors.muted
+                                        : AppColors.cocoaDeep,
+                                    decoration: task.isCompleted
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    decorationColor: AppColors.muted),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          _PriorityBadge(priority: task.priority),
-                        ]),
-                      ),
-                    )),
+                            const SizedBox(width: 8),
+                            _PriorityBadge(priority: task.priority),
+                          ]),
+                        ),
+                      )),
               ],
             ),
           );

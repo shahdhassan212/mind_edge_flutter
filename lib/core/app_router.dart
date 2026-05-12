@@ -11,7 +11,7 @@ import '../screens/forgot_password_email.dart';
 import '../screens/forgot_password_code.dart';
 import '../screens/forgot_password_newpass.dart';
 import '../screens/forgot_password_success.dart';
-import '../screens/dashboard_screen.dart';
+import '../screens/main_screen.dart';
 import '../screens/scan_screen.dart';
 import '../screens/ocr_processing_screen.dart';
 import '../screens/study_plan_screen.dart';

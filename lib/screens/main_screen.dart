@@ -1,5 +1,3 @@
-// screens/dashboard_screen.dart
-// ignore_for_file: unused_import
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/design_tokens.dart';
@@ -36,7 +34,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final planState = ref.watch(studyPlanProvider);
     final hasPlan = planState.hasPlan;
-    final tasks = planState.dashboardTasks.take(3).toList();
+
+    // Filter tasks: show all incomplete, and those completed within the last 24 hours
+    final allRelevantTasks = planState.dashboardTasks.where((t) {
+      if (!t.isCompleted) return true;
+      if (t.completedAt == null) return true;
+      final diff = DateTime.now().difference(t.completedAt!);
+      return diff.inHours < 24;
+    }).toList();
+
+    final tasks = allRelevantTasks.take(3).toList();
 
     return Scaffold(
       backgroundColor: AppColors.dashBgTop,
@@ -74,7 +81,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
           ),
-
           SafeArea(
             child: Column(children: [
               // ── Greeting header
@@ -123,8 +129,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                              color: AppColors.dashGoldLight.withValues(alpha: 0.2)),
+                          border: Border.all(color: AppColors.dashGoldLight.withValues(alpha: 0.2)),
                           boxShadow: [
                             BoxShadow(
                               color: AppColors.dashTextDark.withValues(alpha: 0.06),
@@ -145,7 +150,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Column(children: [
-
                     // ── NO PLAN
                     if (!hasPlan) ...[
                       const SizedBox(height: 32),
@@ -199,8 +203,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.55),
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                                color: AppColors.dashGoldLight.withValues(alpha: 0.2)),
+                            border:
+                                Border.all(color: AppColors.dashGoldLight.withValues(alpha: 0.2)),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.dashTextDark.withValues(alpha: 0.05),
@@ -245,7 +249,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${tasks.where((t) => t.isCompleted).length} of ${planState.dashboardTasks.length} tasks done',
+                                    '${allRelevantTasks.where((t) => t.isCompleted).length} of ${allRelevantTasks.length} tasks done',
                                     style: TextStyle(
                                       fontFamily: 'DM Sans',
                                       fontSize: 11.5,
@@ -279,8 +283,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         GestureDetector(
                           onTap: () => Navigator.pushNamed(context, '/plans'),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
                               color: AppColors.dashTextDark,
                               borderRadius: BorderRadius.circular(100),
@@ -300,7 +303,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
 
                     // ── NO PLAN: empty box
-                    if (!hasPlan)
+                    if (!hasPlan || (hasPlan && allRelevantTasks.isEmpty))
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
                         child: Container(
@@ -317,7 +320,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             const Text('📬', style: TextStyle(fontSize: 36)),
                             const SizedBox(height: 10),
                             Text(
-                              'No tasks for today',
+                              allRelevantTasks.isEmpty && hasPlan
+                                  ? 'All caught up!'
+                                  : 'No tasks for today',
                               style: TextStyle(
                                 fontFamily: 'Syne',
                                 fontSize: 14,
@@ -327,7 +332,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Start a plan to get your daily tasks here',
+                              allRelevantTasks.isEmpty && hasPlan
+                                  ? 'You have completed all your tasks'
+                                  : 'Start a plan to get your daily tasks here',
                               style: TextStyle(
                                 fontFamily: 'DM Sans',
                                 fontSize: 12,
@@ -340,7 +347,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
 
                     // ── HAS PLAN: task list (first 3)
-                    if (hasPlan) ...[
+                    if (hasPlan && allRelevantTasks.isNotEmpty) ...[
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
                         child: Column(
@@ -355,15 +362,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 name: task.taskName,
                                 meta: '${task.duration} · ${task.topicName}',
                                 priority: task.priority,
-                                onToggle: () => ref
-                                    .read(studyPlanProvider.notifier)
-                                    .toggleTask(task.id),
+                                onToggle: () =>
+                                    ref.read(studyPlanProvider.notifier).toggleTask(task.id),
                               ),
                             );
                           }).toList(),
                         ),
                       ),
-
                     ],
 
                     const SizedBox(height: 8),
