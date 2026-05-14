@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:open_filex/open_filex.dart';
 import '../features/analysis/model/analysis_models.dart';
 import '../features/analysis/providers/analysis_providersl.dart';
 import '../theme/design_tokens.dart';
@@ -20,6 +21,29 @@ class AIAnalysisScreen extends ConsumerStatefulWidget {
 class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
   late String _fileName;
   int _tab = 0;
+
+  Future<void> _downloadPdf() async {
+    final state = ref.read(analysisViewModelProvider(_fileName));
+    final title = widget.displayName ?? _fileName;
+
+    // Check if we have at least summary data
+    if (state.summaryData == null && state.rulesData == null && state.definitionsData == null) {
+      AppSnackBar.show(context, 'Analysis not ready yet', isError: true);
+      return;
+    }
+
+    try {
+      final file = await ref.read(analysisRepoProvider).downloadSummaryPdf(
+            title: title,
+            state: state,
+          );
+      if (!mounted) return;
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.show(context, 'Failed to download PDF', isError: true);
+    }
+  }
 
   @override
   void initState() {
@@ -51,7 +75,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
           child: Column(children: [
             AiTopBar(
               onBack: () => Navigator.pop(context),
-              onUpload: () => Navigator.pushNamed(context, '/upload'),
+              onDownload: _downloadPdf,
             ),
             Expanded(child: _buildAnalysis()),
             _buildBottomBar(context),
@@ -80,7 +104,8 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
           child: Row(children: [
             AiStatTile(value: state.visualData?.graphsAnalyzed.toString() ?? '–', label: 'Graphs'),
             const SizedBox(width: 8),
-            AiStatTile(value: state.rulesData?.ruleLines.length.toString() ?? '–', label: 'Rules'),
+            AiStatTile(
+                value: state.rulesData?.parsedRules.length.toString() ?? '–', label: 'Rules'),
             const SizedBox(width: 8),
             AiStatTile(value: state.visualData != null ? '✓' : '–', label: 'Visuals'),
           ]),
@@ -165,17 +190,29 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
             Column(children: List.generate(3, (_) => const AiRuleSkeleton())),
           LoadStatus.failure => AiErrorRetry(
               message: state.rulesError ?? 'Failed to load rules', onRetry: vm.retryRules),
-          LoadStatus.success => state.rulesData!.ruleLines.isEmpty
-              ? AiEmptyState(icon: Icons.rule_rounded, message: 'No rules found in this document')
-              : Column(
-                  children: state.rulesData!.ruleLines
-                      .asMap()
-                      .entries
-                      .map((e) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: AiRuleCard(index: e.key + 1, content: e.value),
-                          ))
-                      .toList()),
+          LoadStatus.success => () {
+              final parsed = state.rulesData!.parsedRules;
+              if (parsed.isEmpty) {
+                // Fallback to markdown if parser got nothing
+                return state.rulesData!.rawRules.trim().isEmpty
+                    ? AiEmptyState(
+                        icon: Icons.rule_rounded, message: 'No rules found in this document')
+                    : AiContentShell(
+                        label: '',
+                        child: AiMarkdownText(text: state.rulesData!.rawRules),
+                      );
+              }
+              return Column(
+                children: parsed
+                    .asMap()
+                    .entries
+                    .map((e) => AiParsedRuleCard(
+                          rule: e.value,
+                          index: e.key + 1,
+                        ))
+                    .toList(),
+              );
+            }(),
         },
       ],
     );
@@ -213,11 +250,44 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
           LoadStatus.failure => AiErrorRetry(
               message: state.definitionError ?? 'Failed to load definitions',
               onRetry: vm.retryDefinitions),
-          LoadStatus.success => state.definitionsData!.markdownContent.trim().isEmpty
-              ? AiEmptyState(
-                  icon: Icons.menu_book_rounded, message: 'No definitions found in this document')
-              : AiContentShell(
-                  label: '', child: AiMarkdownText(text: state.definitionsData!.markdownContent)),
+          LoadStatus.success => () {
+              final parsed = state.definitionsData!.parsedDefinitions;
+              if (parsed.isEmpty) {
+                // Fallback to markdown
+                return state.definitionsData!.markdownContent.trim().isEmpty
+                    ? AiEmptyState(
+                        icon: Icons.menu_book_rounded,
+                        message: 'No definitions found in this document')
+                    : AiContentShell(
+                        label: '',
+                        child: AiMarkdownText(text: state.definitionsData!.markdownContent));
+              }
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.aiCardBg,
+                  border: Border.all(color: AppColors.aiBorder),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                        color: AppColors.aiTextDark.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2))
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const AiSectionLabel('Key Terms'),
+                    const SizedBox(height: 12),
+                    ...parsed
+                        .asMap()
+                        .entries
+                        .map((e) => AiDefinitionRow(def: e.value, index: e.key)),
+                  ],
+                ),
+              );
+            }(),
         },
       ],
     );
@@ -227,7 +297,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
   Widget _buildTopicsChips(AnalysisState state) {
     final topics = state.visualStatus == LoadStatus.success
         ? _extractTopics(state.visualData!.correctedText)
-        : const ['SN1 Mechanism', 'SN2 Mechanism', 'Carbocations', 'Stereochemistry'];
+        : const ['on the way', 'let us crush it today', 'we can do it', 'keep going'];
     return Wrap(
       spacing: 7,
       runSpacing: 7,
@@ -238,9 +308,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
   List<String> _extractTopics(String text) {
     final topics =
         RegExp(r'#{1,3} (.+)').allMatches(text).map((m) => m.group(1)!.trim()).take(6).toList();
-    return topics.isEmpty
-        ? ['Energy Bands', 'Insulators', 'Forbidden Gap', 'Dielectric Strength']
-        : topics;
+    return topics.isEmpty ? ['', '', '', ''] : topics;
   }
 
   // ── Bottom bar ────────────────────────────────────────────────
@@ -263,6 +331,7 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
         ],
       ),
       child: Row(children: [
+        // ── Generate Quiz ──────────────────────────
         Expanded(
           child: GestureDetector(
             onTap: () => Navigator.pushNamed(
@@ -297,29 +366,49 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
             ),
           ),
         ),
+
         const SizedBox(width: 8),
-        GestureDetector(
-          onTap: () =>
-              Navigator.pushNamed(context, '/study-plan', arguments: {'filename': serverFilename}),
-          child: Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppColors.aiTextDark,
-              borderRadius: BorderRadius.circular(13),
-              boxShadow: [
-                BoxShadow(
-                    color: AppColors.aiTextDark.withOpacity(0.30),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4))
-              ],
+
+        // ── Study Plan ─────────────────────────────
+        Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.pushNamed(
+              context,
+              '/study-plan',
+              arguments: {'filename': serverFilename},
             ),
-            child: const Center(
-              child: Icon(Icons.calendar_today_rounded, size: 20, color: Colors.white),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A3A5C), Color(0xFF2A5298)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(13),
+                boxShadow: [
+                  BoxShadow(
+                      color: const Color(0xFF1A3A5C).withOpacity(0.35),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4))
+                ],
+              ),
+              child: const Column(mainAxisSize: MainAxisSize.min, children: [
+                Text('Study Plan',
+                    style: TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+                Text('✦', style: TextStyle(fontSize: 9, color: Color(0x88FFFFFF))),
+              ]),
             ),
           ),
         ),
+
         const SizedBox(width: 8),
+
+        // ── Audio ──────────────────────────────────
         GestureDetector(
           onTap: () {
             if (!audioReady) {
@@ -335,8 +424,8 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
           child: Opacity(
             opacity: audioReady ? 1 : 0.5,
             child: Container(
-              width: 46,
-              height: 46,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                     colors: [AppColors.aiGoldDark, AppColors.aiGoldLight],

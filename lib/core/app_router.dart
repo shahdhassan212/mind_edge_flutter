@@ -13,7 +13,6 @@ import '../screens/forgot_password_newpass.dart';
 import '../screens/forgot_password_success.dart';
 import '../screens/main_screen.dart';
 import '../screens/scan_screen.dart';
-import '../screens/ocr_processing_screen.dart';
 import '../screens/study_plan_screen.dart';
 import '../screens/audio_screen.dart';
 import '../screens/quiz_screen.dart';
@@ -24,6 +23,7 @@ import '../screens/upload_screen.dart';
 import '../screens/ai_analysis_screen.dart';
 import '../screens/ai_chat_screen.dart';
 import '../screens/plans_screen.dart';
+import '../screens/chats_screen.dart';
 import '../features/analysis/model/quiz_models.dart';
 
 class AppRouter {
@@ -94,6 +94,10 @@ class AppRouter {
         page = const PlansScreen();
         break;
 
+      case '/chats':
+        page = const ChatsScreen();
+        break;
+
       // ── Upload screen (entry point for AI analysis)
       case '/upload':
         page = const UploadScreen();
@@ -126,6 +130,7 @@ class AppRouter {
         page = AIChatScreen(
           fileName: args['fileName'] as String? ?? '',
           sessionId: args['sessionId'] as String?,
+          initialMessage: args['initialMessage'] as String?,
         );
         break;
 
@@ -135,9 +140,6 @@ class AppRouter {
         break;
       case '/settings':
         page = const SettingsScreen();
-        break;
-      case '/ocr-processing':
-        page = const OcrProcessingScreen();
         break;
       case '/quiz':
         final args = s.arguments as Map<String, dynamic>? ?? {};

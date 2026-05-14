@@ -1,12 +1,14 @@
+// features/analysis/repository/chat_repository.dart
+
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../model/chat_models.dart';
-import 'package:dio/dio.dart';
 
 class ChatRepository {
   final DioClient _client;
 
-  ChatRepository({required DioClient client}) : _client = client;
+  const ChatRepository({required DioClient client}) : _client = client;
 
   Dio get _dio => _client.dio;
 
@@ -18,27 +20,26 @@ class ChatRepository {
       if (decoded is Map<String, dynamic>) return decoded;
       return Map<String, dynamic>.from(decoded as Map);
     }
-    throw Exception("Unexpected response format");
+    throw Exception('Unexpected response format');
   }
 
+  // ── POST /api/Chat/send ──────────────────────────────────
   Future<ChatResponseModel> sendMessage({
     required String question,
+    required String filename,
     String? sessionId,
     required bool tts,
   }) async {
-    // تجهيز الـ parameters وحذف الـ sessionId إذا كان null
-    final Map<String, dynamic> params = {
-      "question": question,
-      "tts": tts,
-    };
-    
-    if (sessionId != null && sessionId.isNotEmpty) {
-      params["sessionId"] = sessionId;
-    }
+    final body = ChatRequestModel(
+      question: question,
+      filename: filename,
+      sessionId: sessionId,
+      tts: tts,
+    ).toJson();
 
     final resp = await _dio.post(
-      '/api/Chat/chat',
-      queryParameters: params,
+      '/api/Chat/send',
+      data: body,
       options: Options(
         headers: {'accept': '*/*'},
         responseType: ResponseType.json,
@@ -46,5 +47,32 @@ class ChatRepository {
     );
 
     return ChatResponseModel.fromJson(_asJsonMap(resp.data));
+  }
+
+  // ── GET /api/Chat/my-chats ────────────────────────────────
+  Future<List<ChatSession>> fetchMyChats() async {
+    final resp = await _dio.get(
+      '/api/Chat/my-chats',
+      options: Options(
+        headers: {'accept': '*/*'},
+        responseType: ResponseType.json,
+      ),
+    );
+    final list = resp.data as List<dynamic>? ?? [];
+    return list.map((e) => ChatSession.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  // ── GET /api/Chat/history/{sessionId} ────────────────────
+  Future<List<ChatHistoryMessage>> fetchHistory(String sessionId) async {
+    final resp = await _dio.get(
+      '/api/Chat/history/$sessionId',
+      options: Options(
+        headers: {'accept': '*/*'},
+        responseType: ResponseType.json,
+      ),
+    );
+
+    final list = resp.data as List<dynamic>? ?? [];
+    return list.map((e) => ChatHistoryMessage.fromJson(e as Map<String, dynamic>)).toList();
   }
 }

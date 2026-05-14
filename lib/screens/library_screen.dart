@@ -4,8 +4,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:open_filex/open_filex.dart';
 import '../features/files/models/file_model.dart';
 import '../features/files/providers/files_provider.dart';
+import '../features/files/repositories/files_repository.dart';
 import '../features/library/models/folder_model.dart';
 import '../features/library/providers/library_folder_providers.dart';
 
@@ -75,22 +77,35 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
   }
 
-  // ── Analyze a server file ─────────────────────────────────
+  // ── Open file locally ─────────────────────────────────────
+  Future<void> _openServerFile(LibFile file) async {
+    try {
+      // Download to temp then open
+      final localFile = await ref.read(filesRepositoryProvider).downloadFile(file);
+      await OpenFilex.open(localFile.path);
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Could not open file — please try again', success: false);
+    }
+  }
+
   Future<void> _analyzeServerFile(LibFile file) async {
-    _showSnack('Select the file "${file.displayName}" to analyze', success: true);
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'doc', 'docx', 'png', 'jpg', 'jpeg'],
-      allowMultiple: false,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final picked = result.files.first;
-    if (picked.path == null || !mounted) return;
-    Navigator.pushReplacementNamed(
-      context,
-      '/ai-analysis',
-      arguments: <String, String>{'filePath': picked.path!, 'fileName': picked.name},
-    );
+    _showSnack('Preparing "${file.displayName}"…', success: true);
+    try {
+      final localFile = await ref.read(filesRepositoryProvider).downloadFile(file);
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(
+        context,
+        '/ai-analysis',
+        arguments: <String, String>{
+          'filePath': localFile.path,
+          'fileName': file.displayName,
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Failed to load file — please try again', success: false);
+    }
   }
 
   // ── Analyze a folder file ─────────────────────────────────
@@ -382,7 +397,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                     padding: const EdgeInsets.only(bottom: 8),
                                     child: _FileCard(
                                       file: file,
-                                      onTap: () => _analyzeServerFile(file),
+                                      onTap: () => _openServerFile(file),
                                       onAnalyze: () => _analyzeServerFile(file),
                                     ),
                                   )),

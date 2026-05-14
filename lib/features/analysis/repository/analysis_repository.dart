@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../core/network/dio_client.dart';
 import '../model/analysis_models.dart';
 
@@ -62,10 +63,6 @@ class AnalysisRepository {
   }
 
   // ── GET /api/Document/get-rules ──────────────────────────
-  // Response shape:
-  //   { "rules": "<JSON-encoded string>" }
-  // The inner string is itself a JSON object:
-  //   { "filename": "...", "rules": "<markdown or rule text>" }
   Future<RulesModel> fetchRules(String filename) async {
     final resp = await _dio.get(
       '/api/Document/get-rules',
@@ -76,20 +73,11 @@ class AnalysisRepository {
       ),
     );
 
-    final outer = _asJsonMap(resp.data);
-
-    // The value of "rules" key is a JSON-encoded string — decode it
-    final innerRaw = outer['rules'];
-    final inner = _asJsonMap(innerRaw); // handles both String and Map
-
-    return RulesModel.fromJson(inner);
+    // Response is now a flat JSON object: { "filename": "...", "rules": "..." }
+    return RulesModel.fromJson(_asJsonMap(resp.data));
   }
 
   // ── GET /api/Document/get-definitions ────────────────────
-  // Response shape:
-  //   { "definitions": "<JSON-encoded string>" }
-  // The inner string is itself a JSON object:
-  //   { "filename": "...", "definitions": "<markdown string>" }
   Future<DefinitionsModel> fetchDefinitions(String filename) async {
     final resp = await _dio.get(
       '/api/Document/get-definitions',
@@ -100,12 +88,93 @@ class AnalysisRepository {
       ),
     );
 
-    final outer = _asJsonMap(resp.data);
+    // Response is now a flat JSON object: { "filename": "...", "definitions": "..." }
+    return DefinitionsModel.fromJson(_asJsonMap(resp.data));
+  }
 
-    // The value of "definitions" key is a JSON-encoded string — decode it
-    final innerRaw = outer['definitions'];
-    final inner = _asJsonMap(innerRaw);
+  // ── POST /api/Document/DownloadSummaryPdf ────────────────
+  Future<File> downloadSummaryPdf({
+    required String title,
+    required AnalysisState state,
+  }) async {
+    final buffer = StringBuffer();
+    final divider = '=' * 50;
+    final subDivider = '-' * 40;
 
-    return DefinitionsModel.fromJson(inner);
+    // ── Header
+    buffer.writeln(divider);
+    buffer.writeln('  $title');
+    buffer.writeln('  AI Analysis Report');
+    buffer.writeln(divider);
+    buffer.writeln();
+
+    // ── Summary
+    if (state.summaryData?.summary.isNotEmpty == true) {
+      buffer.writeln('SUMMARY');
+      buffer.writeln(subDivider);
+      // Strip markdown symbols for cleaner PDF text
+      final summary = state.summaryData!.summary
+          .replaceAll(RegExp(r'\*\*(.+?)\*\*'), r'\1')
+          .replaceAll(RegExp(r'\*(.+?)\*'), r'\1')
+          .replaceAll(RegExp(r'^#{1,3}\s*', multiLine: true), '')
+          .replaceAll(RegExp(r'^[-•]\s+', multiLine: true), '  • ');
+      buffer.writeln(summary.trim());
+      buffer.writeln();
+    }
+
+    // ── Rules
+    if (state.rulesData?.rawRules.isNotEmpty == true) {
+      buffer.writeln('RULES & FORMULAS');
+      buffer.writeln(subDivider);
+      final rules = state.rulesData!.rawRules
+          .replaceAll(RegExp(r'\*\*(.+?)\*\*'), r'\1')
+          .replaceAll(RegExp(r'`(.+?)`'), r'[\1]')
+          .replaceAll(RegExp(r'^#{1,3}\s*', multiLine: true), '')
+          .replaceAll(RegExp(r'^[-•]\s+', multiLine: true), '  • ');
+      buffer.writeln(rules.trim());
+      buffer.writeln();
+    }
+
+    // ── Definitions
+    if (state.definitionsData?.markdownContent.isNotEmpty == true) {
+      buffer.writeln('KEY DEFINITIONS');
+      buffer.writeln(subDivider);
+      final defs = state.definitionsData!.markdownContent
+          .replaceAll(RegExp(r'\*\*(.+?)\*\*'), r'\1')
+          .replaceAll(RegExp(r'^#{1,3}\s*', multiLine: true), '')
+          .replaceAll(RegExp(r'^\d+\.\s+', multiLine: true), '  ')
+          .replaceAll(RegExp(r'^[-•]\s+', multiLine: true), '    - ');
+      buffer.writeln(defs.trim());
+      buffer.writeln();
+    }
+
+    // ── Visual Analysis
+    if (state.visualData?.correctedText.isNotEmpty == true) {
+      buffer.writeln('VISUAL ANALYSIS');
+      buffer.writeln(subDivider);
+      final analysis = state.visualData!.correctedText
+          .replaceAll(RegExp(r'\*\*(.+?)\*\*'), r'\1')
+          .replaceAll(RegExp(r'^#{1,3}\s*', multiLine: true), '')
+          .replaceAll(RegExp(r'^[-•]\s+', multiLine: true), '  • ');
+      buffer.writeln(analysis.trim());
+      buffer.writeln();
+    }
+
+    buffer.writeln(divider);
+
+    final resp = await _dio.post(
+      '/api/Document/DownloadSummaryPdf',
+      data: {'title': title, 'content': buffer.toString()},
+      options: Options(
+        headers: {'accept': '*/*'},
+        responseType: ResponseType.bytes,
+      ),
+    );
+
+    final dir = await getTemporaryDirectory();
+    final filePath = '${dir.path}/${title}_Summary.pdf';
+    final file = File(filePath);
+    await file.writeAsBytes(resp.data as List<int>);
+    return file;
   }
 }

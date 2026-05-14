@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/design_tokens.dart';
-import '../widgets/common_widgets.dart';
-import '../widgets/dashboard_widgets.dart';
+import '../widgets/main_screen_widgets.dart';
 import '../widgets/robot_widget.dart';
 import '../features/auth/auth_providers.dart';
 import '../features/analysis/model/study_plan_models.dart';
@@ -92,16 +91,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Monday, Oct 24',
-                          style: TextStyle(
-                            fontFamily: 'DM Sans',
-                            fontSize: 11,
-                            color: AppColors.dashTextMuted,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
                         Text.rich(TextSpan(
                           text: 'Good morning, ',
                           style: TextStyle(
@@ -119,28 +108,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ],
                         )),
                       ],
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, '/settings'),
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.dashGoldLight.withValues(alpha: 0.2)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.dashTextDark.withValues(alpha: 0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.settings_outlined,
-                            size: 20, color: AppColors.dashTextDark),
-                      ),
                     ),
                   ],
                 ),
@@ -380,9 +347,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               DashBottomNav(
                 active: 0,
                 onTap: (i) {
+                  if (i == 0) Navigator.pushNamed(context, '/settings');
                   if (i == 1) Navigator.pushNamed(context, '/library');
                   if (i == 2) Navigator.pushNamed(context, '/scan');
-                  if (i == 3) Navigator.pushNamed(context, '/upload');
+                  if (i == 3) Navigator.pushNamed(context, '/chats');
+                  if (i == 4) Navigator.pushNamed(context, '/upload');
                 },
               ),
             ]),

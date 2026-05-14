@@ -1,4 +1,3 @@
-// screens/quiz_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/analysis/model/quiz_models.dart';
@@ -23,6 +22,7 @@ class QuizScreen extends ConsumerStatefulWidget {
 
 class _QuizScreenState extends ConsumerState<QuizScreen> {
   int _currentIndex = 0;
+  int? _selectedCount; // null = selector not confirmed yet
 
   // answers[i] = selected option text (mcq) or typed text (text)
   List<String> _answers = [];
@@ -32,12 +32,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(quizViewModelProvider(widget.filename).notifier).generateQuiz(
-            filename: widget.filename,
-            numQuestions: widget.numQuestions,
-          );
-    });
+    // Do NOT auto-generate — wait for user to pick count
   }
 
   @override
@@ -94,6 +89,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ── Step 1: show selector if count not chosen yet ──────
+    if (_selectedCount == null) return _buildSelector();
+
     final state = ref.watch(quizViewModelProvider(widget.filename));
 
     return Scaffold(
@@ -137,6 +135,212 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     );
   }
 
+  // ── Selector screen ───────────────────────────────────────────
+  Widget _buildSelector() {
+    final controller = TextEditingController(text: '${widget.numQuestions}');
+    String? errorText;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAF4E8),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.0, 0.5, 1.0],
+            colors: [Color(0xFFFDFAF4), Color(0xFFF4E8D6), Color(0xFFECDAC0)],
+          ),
+        ),
+        child: SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setLocal) {
+              void tryStart() {
+                final val = int.tryParse(controller.text.trim());
+                if (val == null || val < 5 || val > 30) {
+                  setLocal(() => errorText = 'Please enter a number between 5 and 30');
+                  return;
+                }
+                setState(() => _selectedCount = val);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  ref.read(quizViewModelProvider(widget.filename).notifier).generateQuiz(
+                        filename: widget.filename,
+                        numQuestions: val,
+                      );
+                });
+              }
+
+              return Column(children: [
+                // ── Top bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
+                  child: Row(children: [
+                    _NavBtn(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Center(
+                          child: Text('✕', style: TextStyle(fontSize: 14, color: AppColors.cocoa)),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    const Text('New Quiz',
+                        style: TextStyle(
+                            fontFamily: 'Syne',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.cocoaDeep)),
+                    const Spacer(),
+                    const SizedBox(width: 36),
+                  ]),
+                ),
+
+                const Spacer(),
+
+                // ── Icon + title
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withOpacity(0.12),
+                        border: Border.all(color: AppColors.gold.withOpacity(0.25)),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Center(
+                        child: Text('✦', style: TextStyle(fontSize: 28)),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'How many questions?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Syne',
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.cocoaDeep,
+                        letterSpacing: -0.4,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Enter a number between 5 and 30',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 13,
+                        color: AppColors.muted.withOpacity(0.8),
+                        fontWeight: FontWeight.w300,
+                        height: 1.5,
+                      ),
+                    ),
+                  ]),
+                ),
+
+                const SizedBox(height: 32),
+
+                // ── Input field
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.62),
+                          border: Border.all(
+                            color: errorText != null
+                                ? const Color(0xFFA32D2D)
+                                : const Color(0xFFB48C50).withOpacity(0.30),
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: AppShadows.sm,
+                        ),
+                        child: TextField(
+                          controller: controller,
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          autofocus: true,
+                          onChanged: (_) => setLocal(() => errorText = null),
+                          onSubmitted: (_) => tryStart(),
+                          style: const TextStyle(
+                            fontFamily: 'Syne',
+                            fontSize: 36,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.cocoaDeep,
+                            letterSpacing: -0.5,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '10',
+                            hintStyle: TextStyle(
+                              fontFamily: 'Syne',
+                              fontSize: 36,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.muted.withOpacity(0.3),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 18),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      if (errorText != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          errorText!,
+                          style: const TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 11.5,
+                            color: Color(0xFFA32D2D),
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                const Spacer(),
+
+                // ── Start button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 0, 32, 28),
+                  child: GestureDetector(
+                    onTap: tryStart,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      decoration: BoxDecoration(
+                        gradient: AppGradients.ctaButton,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: AppShadows.btn,
+                      ),
+                      child: const Text(
+                        'Start Quiz  →',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ]);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Loading ───────────────────────────────────────────────────
   Widget _buildLoading() {
     return const Center(
@@ -163,9 +367,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   const TextStyle(fontFamily: 'DM Sans', fontSize: 14, color: AppColors.cocoaDeep)),
           const SizedBox(height: 20),
           GestureDetector(
-            onTap: () => ref
-                .read(quizViewModelProvider(widget.filename).notifier)
-                .generateQuiz(filename: widget.filename, numQuestions: widget.numQuestions),
+            onTap: () => ref.read(quizViewModelProvider(widget.filename).notifier).generateQuiz(
+                filename: widget.filename, numQuestions: _selectedCount ?? widget.numQuestions),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(

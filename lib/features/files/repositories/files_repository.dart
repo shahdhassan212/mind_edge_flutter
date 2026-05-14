@@ -1,6 +1,6 @@
-// features/files/repositories/files_repository.dart
-
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/file_model.dart';
 import '../../../core/network/dio_client.dart';
 
@@ -13,9 +13,24 @@ class FilesRepository {
   Future<List<LibFile>> fetchFiles() async {
     final resp = await _client.get<Map<String, dynamic>>('/api/File/ListFiles');
 
-    final raw = (resp.data!['files'] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
+    final raw = (resp.data!['files'] as List<dynamic>? ?? []);
 
-    return raw.map(LibFile.fromString).toList();
+    return raw
+        .map((e) => LibFile.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ── Download file from URL to temp path ─────────────────
+  // Used before sending a server file to AIAnalysisScreen.
+  Future<File> downloadFile(LibFile file) async {
+    final dir = await getTemporaryDirectory();
+    final savePath = '${dir.path}/${file.name}';
+
+    // Plain Dio — URL is public/signed, no auth header needed
+    final plainDio = Dio();
+    await plainDio.download(file.fileUrl, savePath);
+
+    return File(savePath);
   }
 
   // ── POST /api/File/Upload  (multipart) ──────────────────

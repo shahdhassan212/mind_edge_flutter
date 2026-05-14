@@ -66,10 +66,23 @@ class AudioSummaryModel {
       );
 }
 
+// ── Parsed rule card ──────────────────────────────────────────
+class ParsedRule {
+  final String title;
+  final String formula;
+  final String description;
+  final List<String> variables;
+
+  const ParsedRule({
+    required this.title,
+    required this.formula,
+    required this.description,
+    required this.variables,
+  });
+}
+
 class RulesModel {
   final String filename;
-
-  /// Raw rules string exactly as returned by the API.
   final String rawRules;
 
   const RulesModel({required this.filename, required this.rawRules});
@@ -80,14 +93,86 @@ class RulesModel {
       );
 
   /// Split the raw string into individual rule entries.
-  /// Each non-blank line is treated as one rule.
   List<String> get ruleLines =>
       rawRules.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+
+  /// Parse rawRules markdown into structured rule cards.
+  /// Handles format:
+  ///   ### Title
+  ///   **Formula:** `...`
+  ///   **Description:** ...
+  ///   **Variables:**
+  ///   - var: desc
+  List<ParsedRule> get parsedRules {
+    final rules = <ParsedRule>[];
+    final lines = rawRules.split('\n');
+
+    String title = '';
+    String formula = '';
+    String description = '';
+    final variables = <String>[];
+    bool inVariables = false;
+
+    void _flush() {
+      if (title.isNotEmpty || formula.isNotEmpty) {
+        rules.add(ParsedRule(
+          title: title,
+          formula: formula,
+          description: description,
+          variables: List.from(variables),
+        ));
+      }
+      title = '';
+      formula = '';
+      description = '';
+      variables.clear();
+      inVariables = false;
+    }
+
+    for (final line in lines) {
+      final t = line.trim();
+      if (t.isEmpty) continue;
+
+      // New rule starts at ### heading
+      if (t.startsWith('###')) {
+        _flush();
+        title = t.replaceFirst(RegExp(r'^#{1,3}\s*'), '').trim();
+        inVariables = false;
+      } else if (t.startsWith('**Formula:**') || t.startsWith('**Formula**:')) {
+        formula = t
+            .replaceFirst(RegExp(r'\*\*Formula\*\*\s*:?\s*|\*\*Formula:\*\*\s*'), '')
+            .replaceAll(RegExp(r'`'), '')
+            .trim();
+        inVariables = false;
+      } else if (t.startsWith('**Description:**') || t.startsWith('**Description**:')) {
+        description = t
+            .replaceFirst(RegExp(r'\*\*Description\*\*\s*:?\s*|\*\*Description:\*\*\s*'), '')
+            .trim();
+        inVariables = false;
+      } else if (t.startsWith('**Variables:**') || t.startsWith('**Variables**:')) {
+        inVariables = true;
+      } else if (inVariables && (t.startsWith('-') || t.startsWith('•'))) {
+        variables.add(t.replaceFirst(RegExp(r'^[-•]\s*'), '').trim());
+      } else if (t.startsWith('##') || t.startsWith('#')) {
+        // h1/h2 = new section, skip
+      }
+    }
+    _flush();
+
+    return rules;
+  }
+}
+
+// ── Parsed definition term ────────────────────────────────────
+class ParsedDefinition {
+  final String term;
+  final String definition;
+
+  const ParsedDefinition({required this.term, required this.definition});
 }
 
 class DefinitionsModel {
   final String filename;
-
   final String markdownContent;
 
   const DefinitionsModel({
@@ -99,6 +184,40 @@ class DefinitionsModel {
         filename: j['filename']?.toString() ?? '',
         markdownContent: j['definitions']?.toString() ?? '',
       );
+
+  /// Parse markdown definitions into term + definition pairs.
+  List<ParsedDefinition> get parsedDefinitions {
+    final defs = <ParsedDefinition>[];
+    final lines = markdownContent.split('\n');
+
+    for (final line in lines) {
+      final t = line.trim();
+      if (t.isEmpty) continue;
+      // Skip headings
+      if (t.startsWith('#')) continue;
+
+      // numbered: 1. **Term**: definition  or  1. **Term (extra)**: definition
+      final numberedMatch = RegExp(r'^\d+\.\s+\*\*(.+?)\*\*\s*[:\-–]\s*(.+)$').firstMatch(t);
+      if (numberedMatch != null) {
+        defs.add(ParsedDefinition(
+          term: numberedMatch.group(1)!.trim(),
+          definition: numberedMatch.group(2)!.trim(),
+        ));
+        continue;
+      }
+
+      // - **Term**: definition
+      final bulletMatch = RegExp(r'^[-•]\s+\*\*(.+?)\*\*\s*[:\-–]\s*(.+)$').firstMatch(t);
+      if (bulletMatch != null) {
+        defs.add(ParsedDefinition(
+          term: bulletMatch.group(1)!.trim(),
+          definition: bulletMatch.group(2)!.trim(),
+        ));
+      }
+    }
+
+    return defs;
+  }
 }
 
 // ── Load status ───────────────────────────────────────────────
@@ -116,12 +235,12 @@ class AnalysisState {
   final AudioSummaryModel? summaryData;
   final String? summaryError;
 
-  // Rules  
+  // Rules
   final LoadStatus rulesStatus;
   final RulesModel? rulesData;
   final String? rulesError;
 
-  // Definitions  
+  // Definitions
   final LoadStatus definitionStatus;
   final DefinitionsModel? definitionsData;
   final String? definitionError;

@@ -1,7 +1,8 @@
 // widgets/ai_analysis_widgets.dart
 // Sub-widgets used only by AIAnalysisScreen
 import 'package:flutter/material.dart';
-import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../features/analysis/model/analysis_models.dart';
 import '../theme/design_tokens.dart';
 
@@ -41,16 +42,23 @@ List<AnalysisSegment> parseSegments(String raw) {
 }
 
 // ─── Top bar ───────────────────────────────────────────────────
-class AiTopBar extends StatelessWidget {
+class AiTopBar extends StatefulWidget {
   final VoidCallback onBack;
-  final VoidCallback onUpload;
-  const AiTopBar({super.key, required this.onBack, required this.onUpload});
+  final Future<void> Function() onDownload;
+  const AiTopBar({super.key, required this.onBack, required this.onDownload});
+
+  @override
+  State<AiTopBar> createState() => _AiTopBarState();
+}
+
+class _AiTopBarState extends State<AiTopBar> {
+  bool _loading = false;
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Row(children: [
-          AiIcoBtn(icon: Icons.arrow_back_ios_new_rounded, onTap: onBack),
+          AiIcoBtn(icon: Icons.arrow_back_ios_new_rounded, onTap: widget.onBack),
           const Expanded(
             child: Center(
               child: Text('AI Analysis',
@@ -61,7 +69,40 @@ class AiTopBar extends StatelessWidget {
                       color: AppColors.aiTextDark)),
             ),
           ),
-          AiIcoBtn(icon: Icons.upload_rounded, onTap: onUpload),
+          GestureDetector(
+            onTap: _loading
+                ? null
+                : () async {
+                    setState(() => _loading = true);
+                    await widget.onDownload();
+                    if (mounted) setState(() => _loading = false);
+                  },
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.aiCardBg.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: AppColors.aiBorder),
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.aiTextDark.withOpacity(0.06),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2))
+                ],
+              ),
+              child: Center(
+                child: _loading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child:
+                            CircularProgressIndicator(strokeWidth: 2, color: AppColors.aiGoldDark),
+                      )
+                    : const Icon(Icons.download_rounded, size: 16, color: AppColors.aiTextDark),
+              ),
+            ),
+          ),
         ]),
       );
 }
@@ -333,7 +374,6 @@ class AiRuleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final segments = parseSegments(content);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
@@ -364,53 +404,7 @@ class AiRuleCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Expanded(
-          child: Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 2,
-            runSpacing: 6,
-            children: segments.map((seg) {
-              if (seg is TextSegment) {
-                final t = seg.text.trim();
-                if (t.isEmpty) return const SizedBox.shrink();
-                return Text(t,
-                    style: const TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 12.5,
-                        color: AppColors.aiTextBody,
-                        height: 1.6,
-                        fontWeight: FontWeight.w400));
-              }
-              final l = seg as LatexSegment;
-              if (l.isDisplay) {
-                return SizedBox(
-                  width: double.infinity,
-                  child: Center(
-                    child: Math.tex(l.latex,
-                        mathStyle: MathStyle.display,
-                        textStyle: const TextStyle(fontSize: 15, color: AppColors.aiTextDark),
-                        onErrorFallback: (e) => Text(l.latex,
-                            style: const TextStyle(
-                                fontFamily: 'DM Mono',
-                                fontSize: 12,
-                                color: AppColors.aiTextMuted))),
-                  ),
-                );
-              }
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                    color: AppColors.aiFormulaTagBg, borderRadius: BorderRadius.circular(8)),
-                child: Math.tex(l.latex,
-                    mathStyle: MathStyle.text,
-                    textStyle: const TextStyle(fontSize: 13, color: AppColors.aiGoldLight),
-                    onErrorFallback: (e) => Text(l.latex,
-                        style: const TextStyle(
-                            fontFamily: 'DM Mono', fontSize: 11, color: AppColors.aiGoldLight))),
-              );
-            }).toList(),
-          ),
-        ),
+        Expanded(child: AiMarkdownText(text: content)),
       ]),
     );
   }
@@ -513,6 +507,252 @@ class _AiGraphCardState extends State<AiGraphCard> {
       );
 }
 
+// ─── Parsed rule card (like the screenshot) ────────────────────
+class AiParsedRuleCard extends StatefulWidget {
+  final ParsedRule rule;
+  final int index;
+  const AiParsedRuleCard({
+    super.key,
+    required this.rule,
+    required this.index,
+  });
+
+  @override
+  State<AiParsedRuleCard> createState() => _AiParsedRuleCardState();
+}
+
+class _AiParsedRuleCardState extends State<AiParsedRuleCard> {
+  bool _expanded = false;
+
+  void _copyFormula() {
+    Clipboard.setData(ClipboardData(text: widget.rule.formula));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            const Text('Formula copied', style: TextStyle(fontFamily: 'DM Sans', fontSize: 12)),
+        backgroundColor: AppColors.aiTextDark,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rule = widget.rule;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.aiCardBg,
+        border: Border.all(color: AppColors.aiBorder, width: 1.2),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.aiTextDark.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.aiFormulaTagBg,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text('Rule ${widget.index}',
+                  style: const TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.aiFormulaTagText,
+                      letterSpacing: 0.3)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(rule.title,
+                  style: const TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.aiTextDark)),
+            ),
+            GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: AnimatedRotation(
+                duration: const Duration(milliseconds: 200),
+                turns: _expanded ? 0.5 : 0,
+                child: const Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 20, color: AppColors.aiTextMuted),
+              ),
+            ),
+          ]),
+        ),
+
+        // ── Formula box
+        if (rule.formula.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.aiTextDark,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(children: [
+                Expanded(
+                  child: Text(rule.formula,
+                      style: const TextStyle(
+                          fontFamily: 'DM Mono',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.aiGoldLight,
+                          letterSpacing: 0.5)),
+                ),
+                GestureDetector(
+                  onTap: _copyFormula,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Text('Copy',
+                        style: TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 10.5,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500)),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+
+        // ── Description
+        if (rule.description.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+            child: Text(rule.description,
+                style: const TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 12,
+                    color: AppColors.aiTextMuted,
+                    height: 1.5,
+                    fontWeight: FontWeight.w300)),
+          ),
+
+        // ── Variables (expandable)
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: _expanded && rule.variables.isNotEmpty
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('VARIABLES',
+                          style: TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.aiTextMuted,
+                              letterSpacing: 1.1)),
+                      const SizedBox(height: 6),
+                      ...rule.variables.map((v) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Container(
+                                margin: const EdgeInsets.only(top: 5),
+                                width: 5,
+                                height: 5,
+                                decoration: const BoxDecoration(
+                                    shape: BoxShape.circle, color: AppColors.aiGoldDark),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(v,
+                                    style: const TextStyle(
+                                        fontFamily: 'DM Sans',
+                                        fontSize: 12,
+                                        color: AppColors.aiTextBody,
+                                        height: 1.5,
+                                        fontWeight: FontWeight.w300)),
+                              ),
+                            ]),
+                          )),
+                    ],
+                  ),
+                )
+              : const SizedBox(height: 14),
+        ),
+      ]),
+    );
+  }
+}
+
+// ─── Parsed definition row ──────────────────────────────────────
+class AiDefinitionRow extends StatelessWidget {
+  final ParsedDefinition def;
+  final int index;
+  const AiDefinitionRow({super.key, required this.def, required this.index});
+
+  static const _termColors = [
+    Color(0xFFC9943A),
+    Color(0xFF8B5E3C),
+    Color(0xFF5E8B3C),
+    Color(0xFF3C5E8B),
+    Color(0xFF8B3C5E),
+    Color(0xFF5E3C8B),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _termColors[index % _termColors.length];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Term chip
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.10),
+            border: Border.all(color: color.withOpacity(0.30)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(def.term,
+              style: TextStyle(
+                  fontFamily: 'DM Sans',
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: color)),
+        ),
+        const SizedBox(width: 10),
+        // Definition
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(def.definition,
+                style: const TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 12,
+                    color: AppColors.aiTextMuted,
+                    height: 1.5,
+                    fontWeight: FontWeight.w300)),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
 // ─── Markdown text ─────────────────────────────────────────────
 class AiMarkdownText extends StatelessWidget {
   final String text;
@@ -520,54 +760,113 @@ class AiMarkdownText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: text.split('\n').map((line) {
-        if (line.startsWith('# ')) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 4),
-            child: Text(line.substring(2),
-                style: const TextStyle(
-                    fontFamily: 'Syne',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.aiTextDark)),
-          );
-        }
-        if (line.startsWith('## ')) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 10, bottom: 3),
-            child: Text(line.substring(3),
-                style: const TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.aiTextDark)),
-          );
-        }
-        if (line.startsWith('### ')) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 2),
-            child: Text(line.substring(4),
-                style: const TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.aiTextBody)),
-          );
-        }
-        if (line.trim().isEmpty) return const SizedBox(height: 4);
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 1.5),
-          child: Text(line.replaceFirst(RegExp(r'^[-•]\s+'), ''),
-              style: const TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 12.5,
-                  color: AppColors.aiTextBody,
-                  height: 1.65,
-                  fontWeight: FontWeight.w300)),
-        );
-      }).toList(),
+    return MarkdownBody(
+      data: text,
+      shrinkWrap: true,
+      selectable: true,
+      styleSheet: MarkdownStyleSheet(
+        // Headings
+        h1: const TextStyle(
+          fontFamily: 'Syne',
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: AppColors.aiTextDark,
+          height: 1.3,
+        ),
+        h2: const TextStyle(
+          fontFamily: 'Syne',
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: AppColors.aiTextDark,
+          height: 1.3,
+        ),
+        h3: const TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.aiTextDark,
+          height: 1.4,
+        ),
+        h4: const TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+          color: AppColors.aiTextBody,
+          height: 1.4,
+        ),
+        // Body
+        p: const TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 13,
+          color: AppColors.aiTextBody,
+          height: 1.65,
+          fontWeight: FontWeight.w300,
+        ),
+        // Bold
+        strong: const TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.aiTextDark,
+        ),
+        // Italic
+        em: const TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 13,
+          fontStyle: FontStyle.italic,
+          color: AppColors.aiTextBody,
+        ),
+        // Bullet list
+        listBullet: const TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 13,
+          color: AppColors.aiGoldDark,
+          fontWeight: FontWeight.w700,
+        ),
+        // Inline code
+        code: TextStyle(
+          fontFamily: 'DM Mono',
+          fontSize: 12,
+          color: AppColors.aiGoldDark,
+          backgroundColor: AppColors.aiFormulaTagBg,
+        ),
+        // Code block
+        codeblockDecoration: BoxDecoration(
+          color: AppColors.aiFormulaCardBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.aiBorder),
+        ),
+        codeblockPadding: const EdgeInsets.all(12),
+        // Blockquote
+        blockquote: const TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 12.5,
+          color: AppColors.aiTextMuted,
+          fontStyle: FontStyle.italic,
+          height: 1.6,
+        ),
+        blockquoteDecoration: BoxDecoration(
+          color: AppColors.aiChipBg,
+          border: Border(
+            left: BorderSide(color: AppColors.aiGoldDark, width: 3),
+          ),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        // Spacing
+        h1Padding: const EdgeInsets.only(top: 14, bottom: 4),
+        h2Padding: const EdgeInsets.only(top: 12, bottom: 4),
+        h3Padding: const EdgeInsets.only(top: 8, bottom: 2),
+        pPadding: const EdgeInsets.only(bottom: 6),
+        listIndent: 20,
+        blockSpacing: 8,
+        // Horizontal rule
+        horizontalRuleDecoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: AppColors.aiBorder, width: 1),
+          ),
+        ),
+      ),
     );
   }
 }

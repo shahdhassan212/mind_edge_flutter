@@ -116,8 +116,16 @@ class SignInViewModel extends ChangeNotifier {
 
   String? validate() {
     final email = emailCtrl.text.trim();
-    if (email.isEmpty || passwordCtrl.text.isEmpty) return 'Please fill in all fields.';
+    final password = passwordCtrl.text.trim();
+
+    if (email.isEmpty || password.isEmpty) return 'Please fill in all fields.';
     if (!email.contains('@')) return 'Please enter a valid email.';
+    if (password.length < 6) return 'Password must be at least 6 characters.';
+
+    final hasLetter = RegExp(r'[A-Za-z]').hasMatch(password);
+    final hasNumber = RegExp(r'[0-9]').hasMatch(password);
+    if (!hasLetter || !hasNumber) return 'Password must contain letters and numbers.';
+
     return null;
   }
 
@@ -245,6 +253,12 @@ class SignUpViewModel extends ChangeNotifier {
     }
     if (!emailCtrl.text.contains('@')) return 'Please enter a valid email.';
     if (passwordStrength < 2) return 'Please choose a stronger password.';
+
+    final password = passwordCtrl.text.trim();
+    final hasLetter = RegExp(r'[A-Za-z]').hasMatch(password);
+    final hasNumber = RegExp(r'[0-9]').hasMatch(password);
+    if (!hasLetter || !hasNumber) return 'Password must contain letters and numbers.';
+
     if (!termsAccepted) return 'Please accept the Terms of Service.';
     return null;
   }

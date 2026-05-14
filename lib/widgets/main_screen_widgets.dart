@@ -269,7 +269,14 @@ class DashAIStrip extends StatelessWidget {
 }
 
 // ── Bottom nav ─────────────────────────────────────────────────
-// 3 items only: Library | FAB | AI
+// 5 items: Settings | Library | FAB(+) | Chats | AI
+//
+// Index map (passed to onTap):
+//   0 = Settings
+//   1 = Library
+//   FAB = 2  (scan/upload)
+//   3 = Chats
+//   4 = AI
 class DashBottomNav extends StatelessWidget {
   final int active;
   final void Function(int) onTap;
@@ -278,7 +285,7 @@ class DashBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(40, 10, 40, 20),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
       decoration: BoxDecoration(
         color: AppColors.dashSurface,
         border: Border(top: BorderSide(color: AppColors.dashNavBorder, width: 1)),
@@ -300,7 +307,15 @@ class DashBottomNav extends StatelessWidget {
             onTap: () => onTap(1),
           ),
 
-          // FAB — scan/add
+          // Chats
+          _NavItem(
+            icon: Icons.chat_bubble_outline_rounded,
+            label: 'Chats',
+            on: active == 3,
+            onTap: () => onTap(3),
+          ),
+
+          // FAB — scan/upload
           GestureDetector(
             onTap: () => onTap(2),
             child: Container(
@@ -327,8 +342,16 @@ class DashBottomNav extends StatelessWidget {
           _NavItem(
             icon: Icons.smart_toy_rounded,
             label: 'AI',
-            on: active == 3,
-            onTap: () => onTap(3),
+            on: active == 4,
+            onTap: () => onTap(4),
+          ),
+
+          // Settings
+          _NavItem(
+            icon: Icons.settings_outlined,
+            label: 'Settings',
+            on: active == 0,
+            onTap: () => onTap(0),
           ),
         ],
       ),

@@ -260,42 +260,31 @@ class QuizResultScreen extends StatelessWidget {
                     // ── CTAs
                     Padding(
                       padding: const EdgeInsets.fromLTRB(26, 12, 26, 0),
-                      child: Row(children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => Navigator.pushReplacementNamed(
-                              context,
-                              '/quiz',
-                              arguments: {'filename': filename},
-                            ),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.62),
-                                border: Border.all(
-                                    color: const Color(0xFFB48C50).withOpacity(0.18), width: 1.5),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: AppShadows.sm,
-                              ),
-                              child: const Text('Retry Quiz',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      fontFamily: 'DM Sans',
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.cocoa)),
-                            ),
-                          ),
+                      child: GestureDetector(
+                        onTap: () => Navigator.pushReplacementNamed(
+                          context,
+                          '/quiz',
+                          arguments: {'filename': filename},
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          flex: 4,
-                          child: AppButton(
-                            label: 'Study Weak Areas ✦',
-                            onTap: () => Navigator.pushNamed(context, '/audio'),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.62),
+                            border: Border.all(
+                                color: const Color(0xFFB48C50).withOpacity(0.18), width: 1.5),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: AppShadows.sm,
                           ),
+                          child: const Text('Retry Quiz',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontFamily: 'DM Sans',
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.cocoa)),
                         ),
-                      ]),
+                      ),
                     ),
                   ]),
                 ),

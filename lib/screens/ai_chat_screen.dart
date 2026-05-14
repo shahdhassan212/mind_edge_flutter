@@ -7,7 +7,13 @@ import '../theme/design_tokens.dart';
 class AIChatScreen extends ConsumerStatefulWidget {
   final String fileName;
   final String? sessionId;
-  const AIChatScreen({super.key, required this.fileName, this.sessionId});
+  final String? initialMessage;
+  const AIChatScreen({
+    super.key,
+    required this.fileName,
+    this.sessionId,
+    this.initialMessage,
+  });
 
   @override
   ConsumerState<AIChatScreen> createState() => _AIChatScreenState();
@@ -20,11 +26,19 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.sessionId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(chatProvider.notifier).setSessionId(widget.sessionId!);
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(chatProvider.notifier).init(
+            filename: widget.fileName,
+            sessionId: widget.sessionId,
+          );
+      if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
+        Future.delayed(const Duration(milliseconds: 400), () {
+          if (mounted) {
+            ref.read(chatProvider.notifier).sendMessage(widget.initialMessage!);
+          }
+        });
+      }
+    });
   }
 
   @override
