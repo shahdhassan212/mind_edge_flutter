@@ -15,28 +15,19 @@ class ScanScreen extends ConsumerStatefulWidget {
   ConsumerState<ScanScreen> createState() => _ScanScreenState();
 }
 
-class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProviderStateMixin {
-  int _tab = 0;
-  late AnimationController _beamCtrl;
-  late Animation<double> _beamAnim;
-  double _progress = 0.64;
+class _ScanScreenState extends ConsumerState<ScanScreen> {
+  bool _flashOn = false;
+  String? _camError;
 
   // ── Camera state ──────────────────────────────────────────
   CameraController? _camCtrl;
   List<CameraDescription> _cameras = [];
   int _camIndex = 0;
   bool _camReady = false;
-  bool _flashOn = false;
-  String? _camError;
 
   @override
   void initState() {
     super.initState();
-    _beamCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat();
-    _beamAnim = CurvedAnimation(parent: _beamCtrl, curve: Curves.easeInOut);
     _initCamera();
   }
 
@@ -198,7 +189,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
 
   @override
   void dispose() {
-    _beamCtrl.dispose();
     _camCtrl?.dispose();
     super.dispose();
   }
@@ -224,9 +214,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
             Padding(
               padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
               child: Row(children: [
-                ScanDarkNavBtn(
-                  child:
-                      const Text('←', style: TextStyle(fontSize: 16, color: AppColors.goldLight)),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: ScanDarkNavBtn(
+                    child:
+                        const Text('←', style: TextStyle(fontSize: 16, color: AppColors.goldLight)),
+                  ),
                 ),
                 const Spacer(),
                 const Text('Scan Document',
@@ -288,31 +281,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
                           right: 14,
                           child: ScanCorner(
                               br: true, color: const Color(0xFFB48C50).withOpacity(0.7))),
-
-                      // Scan beam
-                      if (_camReady)
-                        AnimatedBuilder(
-                          animation: _beamAnim,
-                          builder: (context, _) => Positioned(
-                            top:
-                                18 + (_beamAnim.value * (MediaQuery.of(context).size.height * 0.4)),
-                            left: 14,
-                            right: 14,
-                            height: 2,
-                            child: Opacity(
-                              opacity: (1 - _beamAnim.value * 0.5),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(colors: [
-                                    Colors.transparent,
-                                    AppColors.gold.withOpacity(0.8),
-                                    Colors.transparent,
-                                  ]),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
 
                       // OCR badge
                       Positioned(
@@ -383,54 +351,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
 
             const SizedBox(height: 14),
 
-            // ── Tab strip ─────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  border: Border.all(color: AppColors.gold.withOpacity(0.14)),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: ['Camera', 'Gallery', 'PDF / File']
-                      .asMap()
-                      .map((i, label) {
-                        final on = i == _tab;
-                        return MapEntry(
-                          i,
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => _tab = i),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(vertical: 9),
-                                decoration: BoxDecoration(
-                                  color: on ? AppColors.gold.withOpacity(0.15) : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(label,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontFamily: 'DM Sans',
-                                      fontSize: 11,
-                                      fontWeight: on ? FontWeight.w600 : FontWeight.w500,
-                                      color: on
-                                          ? AppColors.goldLight
-                                          : AppColors.white.withOpacity(0.4),
-                                    )),
-                              ),
-                            ),
-                          ),
-                        );
-                      })
-                      .values
-                      .toList(),
-                ),
-              ),
-            ),
-
             const SizedBox(height: 18),
 
             // ── Shutter row ───────────────────────────────
@@ -473,66 +393,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
             ]),
 
             const SizedBox(height: 14),
-
-            // ── AI processing strip ───────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
-                  border: Border.all(color: AppColors.gold.withOpacity(0.18)),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withOpacity(0.1),
-                      border: Border.all(color: AppColors.gold.withOpacity(0.22)),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Center(child: Text('✦', style: TextStyle(fontSize: 16))),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('AI Analyzing Document',
-                            style: TextStyle(
-                              fontFamily: 'DM Sans',
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.white.withOpacity(0.85),
-                            )),
-                        const SizedBox(height: 2),
-                        Text('Extracting text, structure, and topics…',
-                            style: TextStyle(
-                              fontFamily: 'DM Sans',
-                              fontSize: 10.5,
-                              color: AppColors.white.withOpacity(0.4),
-                              fontWeight: FontWeight.w300,
-                            )),
-                        const SizedBox(height: 8),
-                        ScanProgressBar(value: _progress),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text('${(_progress * 100).toInt()}%',
-                      style: const TextStyle(
-                        fontFamily: 'Syne',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.gold,
-                      )),
-                ]),
-              ),
-            ),
-
-            const SizedBox(height: 12),
             Text('Hold camera steady · Multi-page supported',
                 textAlign: TextAlign.center,
                 style: TextStyle(

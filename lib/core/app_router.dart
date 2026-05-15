@@ -116,13 +116,14 @@ class AppRouter {
           fileName = raw['fileName'] as String?;
         }
         if (filePath == null) {
-          page = const UploadScreen();
-        } else {
-          page = AIAnalysisScreen(
-            file: File(filePath),
-            displayName: fileName ?? filePath.split('/').last,
-          );
+          // Re-dispatch as /upload so the route name in the back-stack
+          // matches the screen actually shown.
+          return onGenerateRoute(const RouteSettings(name: '/upload'));
         }
+        page = AIAnalysisScreen(
+          file: File(filePath),
+          displayName: fileName ?? filePath.split('/').last,
+        );
         break;
 
       case '/ai-chat':

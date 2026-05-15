@@ -1,5 +1,6 @@
 // screens/ai_chat_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/analysis/providers/chat_providers.dart';
 import '../theme/design_tokens.dart';
@@ -364,16 +365,80 @@ class _ChatBubble extends StatelessWidget {
                           offset: const Offset(0, 2)),
                     ],
                   ),
-                  child: Text(
-                    msg.text,
-                    style: TextStyle(
-                      fontFamily: 'DM Sans',
-                      fontSize: 13,
-                      color: msg.isUser ? Colors.white : AppColors.aiTextDark,
-                      height: 1.55,
-                      fontWeight: FontWeight.w300,
-                    ),
-                  ),
+                  child: msg.isUser
+                      ? Text(
+                          msg.text,
+                          style: const TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 13,
+                            color: Colors.white,
+                            height: 1.55,
+                            fontWeight: FontWeight.w300,
+                          ),
+                        )
+                      : MarkdownBody(
+                          data: msg.text,
+                          shrinkWrap: true,
+                          selectable: true,
+                          styleSheet: MarkdownStyleSheet(
+                            p: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 13,
+                              color: AppColors.aiTextDark,
+                              height: 1.6,
+                              fontWeight: FontWeight.w300,
+                            ),
+                            strong: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.aiTextDark,
+                            ),
+                            em: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 13,
+                              fontStyle: FontStyle.italic,
+                              color: AppColors.aiTextBody,
+                            ),
+                            h1: const TextStyle(
+                              fontFamily: 'Syne',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.aiTextDark,
+                            ),
+                            h2: const TextStyle(
+                              fontFamily: 'Syne',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.aiTextDark,
+                            ),
+                            h3: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.aiTextDark,
+                            ),
+                            listBullet: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 13,
+                              color: AppColors.aiGoldDark,
+                            ),
+                            code: TextStyle(
+                              fontFamily: 'DM Mono',
+                              fontSize: 12,
+                              color: AppColors.aiGoldDark,
+                              backgroundColor: AppColors.aiFormulaTagBg,
+                            ),
+                            codeblockDecoration: BoxDecoration(
+                              color: AppColors.aiFormulaCardBg,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.aiBorder),
+                            ),
+                            blockSpacing: 6,
+                            listIndent: 18,
+                            pPadding: const EdgeInsets.only(bottom: 4),
+                          ),
+                        ),
                 ),
                 if (!msg.isUser && msg.audioUrl != null && msg.audioUrl!.isNotEmpty)
                   Padding(

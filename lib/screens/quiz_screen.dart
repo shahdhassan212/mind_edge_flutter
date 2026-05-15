@@ -4,7 +4,6 @@ import '../features/analysis/model/quiz_models.dart';
 import '../features/analysis/providers/quiz_providers.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/animation_helpers.dart';
-import '../widgets/common_widgets.dart';
 
 class QuizScreen extends ConsumerStatefulWidget {
   final String filename;
