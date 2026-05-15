@@ -18,12 +18,14 @@ class QuizViewModel extends StateNotifier<QuizState> {
   Future<void> generateQuiz({
     required String filename,
     required int numQuestions,
+    required QuizType quizType,
   }) async {
     state = state.copyWith(generateStatus: QuizLoadStatus.loading, error: null);
     try {
       final data = await _repo.generateQuiz(
         filename: filename,
         numQuestions: numQuestions,
+        quizType: quizType,
       );
       state = state.copyWith(
         generateStatus: QuizLoadStatus.success,

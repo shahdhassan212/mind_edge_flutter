@@ -1,23 +1,61 @@
 // features/quiz/model/quiz_models.dart
 
+// ── Quiz type ─────────────────────────────────────────────────
+enum QuizType {
+  mcq,
+  essay,
+  trueFalse,
+  mix;
+
+  String get apiValue {
+    switch (this) {
+      case QuizType.mcq:       return 'MCQ';
+      case QuizType.essay:     return 'ESSAY';
+      case QuizType.trueFalse: return 'TRUE_FALSE';
+      case QuizType.mix:       return 'MIX';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case QuizType.mcq:       return 'MCQ';
+      case QuizType.essay:     return 'Essay';
+      case QuizType.trueFalse: return 'True / False';
+      case QuizType.mix:       return 'Mix';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case QuizType.mcq:       return 'Multiple choice questions';
+      case QuizType.essay:     return 'Open-ended written answers';
+      case QuizType.trueFalse: return 'True or false statements';
+      case QuizType.mix:       return 'Combination of all types';
+    }
+  }
+}
+
 // ── Generate request ──────────────────────────────────────────
 class QuizGenerateRequest {
   final String filename;
   final int numQuestions;
+  final QuizType quizType;
 
   const QuizGenerateRequest({
     required this.filename,
     required this.numQuestions,
+    required this.quizType,
   });
 
   Map<String, dynamic> toJson() => {
         'filename': filename,
         'numQuestions': numQuestions,
+        'quizType': quizType.apiValue,
       };
 }
 
 // ── Single question ───────────────────────────────────────────
-enum QuizQuestionType { mcq, text }
+enum QuizQuestionType { mcq, essay, trueFalse }
 
 class QuizQuestion {
   final String question;
@@ -31,7 +69,18 @@ class QuizQuestion {
   });
 
   factory QuizQuestion.fromJson(Map<String, dynamic> json) {
-    final type = json['type'] == 'mcq' ? QuizQuestionType.mcq : QuizQuestionType.text;
+    final rawType = json['type']?.toString() ?? '';
+    final QuizQuestionType type;
+    switch (rawType) {
+      case 'mcq':
+        type = QuizQuestionType.mcq;
+        break;
+      case 'true_false':
+        type = QuizQuestionType.trueFalse;
+        break;
+      default:
+        type = QuizQuestionType.essay;
+    }
     return QuizQuestion(
       question: json['question'] as String,
       type: type,

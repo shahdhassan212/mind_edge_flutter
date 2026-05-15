@@ -78,6 +78,55 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   // ── Open file locally ─────────────────────────────────────
+  // ── Delete server file ────────────────────────────────────
+  Future<void> _deleteServerFile(LibFile file) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: const Color(0xFFFEFCF7),
+        title: const Text('Delete File',
+            style: TextStyle(fontFamily: 'Syne', fontSize: 15, fontWeight: FontWeight.w700)),
+        content: Text(
+          'Are you sure you want to delete "${file.displayName}"? This cannot be undone.',
+          style: const TextStyle(fontFamily: 'DM Sans', fontSize: 13, color: Color(0xFF9E8A72)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel',
+                style: TextStyle(fontFamily: 'DM Sans', color: Color(0xFF9E8A72))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete',
+                style: TextStyle(
+                    fontFamily: 'DM Sans', fontWeight: FontWeight.w700, color: Color(0xFFA32D2D))),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final ok = await ref.read(deleteFileProvider.notifier).delete(file.name);
+    if (!mounted) return;
+    _showSnack(
+      ok ? '✓  "${file.displayName}" deleted' : 'Delete failed — please try again',
+      success: ok,
+    );
+  }
+
+  // ── Rename server file ────────────────────────────────────
+  Future<void> _renameServerFile(LibFile file) async {
+    final newName = await _promptFileName(context, title: 'Rename File', initial: file.displayName);
+    if (newName == null || newName.trim().isEmpty || !mounted) return;
+    final ok = await ref.read(renameFileProvider.notifier).rename(file.name, newName.trim());
+    if (!mounted) return;
+    _showSnack(
+      ok ? '✓  Renamed to "$newName"' : 'Rename failed — please try again',
+      success: ok,
+    );
+  }
+
   Future<void> _openServerFile(LibFile file) async {
     try {
       // Download to temp then open
@@ -399,6 +448,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                       file: file,
                                       onTap: () => _openServerFile(file),
                                       onAnalyze: () => _analyzeServerFile(file),
+                                      onDelete: () => _deleteServerFile(file),
+                                      onRename: () => _renameServerFile(file),
                                     ),
                                   )),
                           ],
@@ -723,7 +774,16 @@ class _FileCard extends StatelessWidget {
   final LibFile file;
   final VoidCallback onTap;
   final VoidCallback onAnalyze;
-  const _FileCard({required this.file, required this.onTap, required this.onAnalyze});
+  final VoidCallback onDelete;
+  final VoidCallback onRename;
+
+  const _FileCard({
+    required this.file,
+    required this.onTap,
+    required this.onAnalyze,
+    required this.onDelete,
+    required this.onRename,
+  });
 
   IconData get _icon {
     switch (file.ext) {
@@ -844,6 +904,22 @@ class _FileCard extends StatelessWidget {
                   child: Icon(Icons.auto_awesome_rounded, size: 15, color: _C.goldDark),
                 ),
               ),
+            ),
+            const SizedBox(width: 4),
+            PopupMenuButton<String>(
+              onSelected: (v) {
+                if (v == 'rename') onRename();
+                if (v == 'delete') onDelete();
+              },
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'rename', child: Text('Rename')),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete', style: TextStyle(color: Color(0xFFA32D2D))),
+                ),
+              ],
+              child: const Icon(Icons.more_vert_rounded, size: 18, color: _C.textMuted),
             ),
           ]),
         ),
@@ -1109,6 +1185,18 @@ Future<String?> _promptFolderName(
 }) {
   // ✅ No controller here — it lives inside _FolderNameDialogState.
   // ✅ No dispose() call needed — Flutter handles it automatically.
+  return showDialog<String>(
+    context: context,
+    builder: (_) => _FolderNameDialog(title: title, initial: initial),
+  );
+}
+
+/// Shows a file-name prompt and returns the trimmed name, or null if cancelled.
+Future<String?> _promptFileName(
+  BuildContext context, {
+  required String title,
+  String initial = '',
+}) {
   return showDialog<String>(
     context: context,
     builder: (_) => _FolderNameDialog(title: title, initial: initial),

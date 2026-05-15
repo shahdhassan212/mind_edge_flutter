@@ -3,7 +3,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/file_model.dart';
 import '../repositories/files_repository.dart';
-import '../../../features/auth/auth_view_model.dart'; // imports dioClientProvider
+import '../../../features/auth/auth_view_model.dart';
 
 // ── Repository provider ──────────────────────────────────────
 final filesRepositoryProvider = Provider<FilesRepository>(
@@ -24,12 +24,8 @@ class UploadNotifier extends AsyncNotifier<void> {
     state = const AsyncValue.loading();
     try {
       final ok = await ref.read(filesRepositoryProvider).uploadFile(filePath, fileName);
-
       state = const AsyncValue.data(null);
-
-      if (ok) {
-        ref.invalidate(filesProvider);
-      }
+      if (ok) ref.invalidate(filesProvider);
       return ok;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -39,3 +35,45 @@ class UploadNotifier extends AsyncNotifier<void> {
 }
 
 final uploadProvider = AsyncNotifierProvider<UploadNotifier, void>(UploadNotifier.new);
+
+// ── Delete notifier ───────────────────────────────────────────
+class DeleteFileNotifier extends AsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  Future<bool> delete(String filename) async {
+    state = const AsyncValue.loading();
+    try {
+      final ok = await ref.read(filesRepositoryProvider).deleteFile(filename);
+      state = const AsyncValue.data(null);
+      if (ok) ref.invalidate(filesProvider);
+      return ok;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+}
+
+final deleteFileProvider = AsyncNotifierProvider<DeleteFileNotifier, void>(DeleteFileNotifier.new);
+
+// ── Rename notifier ───────────────────────────────────────────
+class RenameFileNotifier extends AsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  Future<bool> rename(String oldName, String newName) async {
+    state = const AsyncValue.loading();
+    try {
+      final ok = await ref.read(filesRepositoryProvider).renameFile(oldName, newName);
+      state = const AsyncValue.data(null);
+      if (ok) ref.invalidate(filesProvider);
+      return ok;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+}
+
+final renameFileProvider = AsyncNotifierProvider<RenameFileNotifier, void>(RenameFileNotifier.new);

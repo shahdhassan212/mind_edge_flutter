@@ -27,10 +27,12 @@ class QuizRepository {
   Future<QuizGenerateResponse> generateQuiz({
     required String filename,
     required int numQuestions,
+    required QuizType quizType,
   }) async {
     final body = QuizGenerateRequest(
       filename: filename,
       numQuestions: numQuestions,
+      quizType: quizType,
     ).toJson();
 
     final resp = await _dio.post(

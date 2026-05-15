@@ -22,17 +22,16 @@ class QuizScreen extends ConsumerStatefulWidget {
 
 class _QuizScreenState extends ConsumerState<QuizScreen> {
   int _currentIndex = 0;
-  int? _selectedCount; // null = selector not confirmed yet
+  int? _selectedCount;
+  QuizType? _selectedType;
 
-  // answers[i] = selected option text (mcq) or typed text (text)
   List<String> _answers = [];
-
   final Map<int, TextEditingController> _textControllers = {};
 
   @override
   void initState() {
     super.initState();
-    // Do NOT auto-generate — wait for user to pick count
+    // Do NOT auto-generate — wait for user to pick count and type
   }
 
   @override
@@ -54,9 +53,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   }
 
   void _goNext(List<QuizQuestion> questions) {
-    // Sync text answer before moving
     final q = questions[_currentIndex];
-    if (q.type == QuizQuestionType.text) {
+    if (q.type == QuizQuestionType.essay) {
       _answers[_currentIndex] = _controllerFor(_currentIndex).text.trim();
     }
 
@@ -89,8 +87,10 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ── Step 1: show selector if count not chosen yet ──────
-    if (_selectedCount == null) return _buildSelector();
+    // ── Step 1: pick count
+    if (_selectedCount == null) return _buildCountSelector();
+    // ── Step 2: pick type
+    if (_selectedType == null) return _buildTypeSelector();
 
     final state = ref.watch(quizViewModelProvider(widget.filename));
 
@@ -135,8 +135,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     );
   }
 
-  // ── Selector screen ───────────────────────────────────────────
-  Widget _buildSelector() {
+  // ── Count selector screen ─────────────────────────────────────
+  Widget _buildCountSelector() {
     final controller = TextEditingController(text: '${widget.numQuestions}');
     String? errorText;
 
@@ -163,12 +163,6 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   return;
                 }
                 setState(() => _selectedCount = val);
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  ref.read(quizViewModelProvider(widget.filename).notifier).generateQuiz(
-                        filename: widget.filename,
-                        numQuestions: val,
-                      );
-                });
               }
 
               return Column(children: [
@@ -341,6 +335,212 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     );
   }
 
+  // ── Type selector screen ──────────────────────────────────────
+  Widget _buildTypeSelector() {
+    final types = QuizType.values;
+    QuizType selected = QuizType.mix;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAF4E8),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.0, 0.5, 1.0],
+            colors: [Color(0xFFFDFAF4), Color(0xFFF4E8D6), Color(0xFFECDAC0)],
+          ),
+        ),
+        child: SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setLocal) {
+              return Column(children: [
+                // ── Top bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
+                  child: Row(children: [
+                    _NavBtn(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedCount = null),
+                        child: const Center(
+                          child: Text('←', style: TextStyle(fontSize: 16, color: AppColors.cocoa)),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    const Text('New Quiz',
+                        style: TextStyle(
+                            fontFamily: 'Syne',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.cocoaDeep)),
+                    const Spacer(),
+                    const SizedBox(width: 36),
+                  ]),
+                ),
+
+                const Spacer(),
+
+                // ── Title
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withOpacity(0.12),
+                        border: Border.all(color: AppColors.gold.withOpacity(0.25)),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Center(child: Text('📝', style: TextStyle(fontSize: 28))),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text('Question Type',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Syne',
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.cocoaDeep,
+                          letterSpacing: -0.4,
+                        )),
+                    const SizedBox(height: 8),
+                    Text('Choose the type of questions',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 13,
+                          color: AppColors.muted.withOpacity(0.8),
+                          fontWeight: FontWeight.w300,
+                        )),
+                  ]),
+                ),
+
+                const SizedBox(height: 28),
+
+                // ── Type options
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    children: types.map((type) {
+                      final isSelected = selected == type;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: GestureDetector(
+                          onTap: () => setLocal(() => selected = type),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.cocoa.withOpacity(0.08)
+                                  : Colors.white.withOpacity(0.6),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.cocoa
+                                    : const Color(0xFFB48C50).withOpacity(0.18),
+                                width: 1.5,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: AppShadows.sm,
+                            ),
+                            child: Row(children: [
+                              // Radio indicator
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isSelected ? AppColors.cocoa : Colors.transparent,
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.cocoa
+                                        : AppColors.muted.withOpacity(0.4),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: isSelected
+                                    ? const Center(
+                                        child: Icon(Icons.check, size: 12, color: Colors.white))
+                                    : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(type.label,
+                                        style: TextStyle(
+                                          fontFamily: 'DM Sans',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: isSelected ? AppColors.cocoa : AppColors.cocoaDeep,
+                                        )),
+                                    Text(type.description,
+                                        style: TextStyle(
+                                          fontFamily: 'DM Sans',
+                                          fontSize: 11,
+                                          color: AppColors.muted.withOpacity(0.7),
+                                          fontWeight: FontWeight.w300,
+                                        )),
+                                  ],
+                                ),
+                              ),
+                            ]),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+                const Spacer(),
+
+                // ── Start button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 0, 32, 28),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => _selectedType = selected);
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        ref.read(quizViewModelProvider(widget.filename).notifier).generateQuiz(
+                              filename: widget.filename,
+                              numQuestions: _selectedCount!,
+                              quizType: selected,
+                            );
+                      });
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      decoration: BoxDecoration(
+                        gradient: AppGradients.ctaButton,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: AppShadows.btn,
+                      ),
+                      child: const Text('Start Quiz  →',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.white,
+                          )),
+                    ),
+                  ),
+                ),
+              ]);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Loading ───────────────────────────────────────────────────
   Widget _buildLoading() {
     return const Center(
@@ -368,7 +568,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           const SizedBox(height: 20),
           GestureDetector(
             onTap: () => ref.read(quizViewModelProvider(widget.filename).notifier).generateQuiz(
-                filename: widget.filename, numQuestions: _selectedCount ?? widget.numQuestions),
+                filename: widget.filename,
+                numQuestions: _selectedCount ?? widget.numQuestions,
+                quizType: _selectedType ?? QuizType.mix),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
@@ -502,7 +704,11 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
                         Text(
-                          q.type == QuizQuestionType.mcq ? 'MULTIPLE CHOICE' : 'WRITTEN ANSWER',
+                          q.type == QuizQuestionType.mcq
+                              ? 'MULTIPLE CHOICE'
+                              : q.type == QuizQuestionType.trueFalse
+                                  ? 'TRUE / FALSE'
+                                  : 'WRITTEN ANSWER',
                           style: const TextStyle(
                               fontFamily: 'DM Sans',
                               fontSize: 9.5,
@@ -533,7 +739,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               padding: const EdgeInsets.fromLTRB(26, 10, 26, 0),
               child: q.type == QuizQuestionType.mcq
                   ? _buildMcqOptions(q, _currentIndex)
-                  : _buildTextAnswer(_currentIndex),
+                  : q.type == QuizQuestionType.trueFalse
+                      ? _buildTrueFalseOptions(_currentIndex)
+                      : _buildTextAnswer(_currentIndex),
             ),
           ]),
         ),
@@ -598,6 +806,52 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   }
 
   // ── MCQ options ───────────────────────────────────────────────
+  Widget _buildTrueFalseOptions(int questionIndex) {
+    final options = ['True', 'False'];
+    return Column(
+      children: options.map((opt) {
+        final selected = _answers[questionIndex] == opt;
+        final isTrue = opt == 'True';
+        final selColor = isTrue ? const Color(0xFF2A9D6A) : const Color(0xFFC05A32);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: GestureDetector(
+            onTap: () => setState(() => _answers[questionIndex] = opt),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              decoration: BoxDecoration(
+                color: selected ? selColor.withOpacity(0.08) : Colors.white.withOpacity(0.6),
+                border: Border.all(
+                  color: selected ? selColor : const Color(0xFFB48C50).withOpacity(0.18),
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: AppShadows.sm,
+              ),
+              child: Row(children: [
+                Icon(
+                  isTrue ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+                  size: 20,
+                  color: selected ? selColor : AppColors.muted,
+                ),
+                const SizedBox(width: 12),
+                Text(opt,
+                    style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? selColor : AppColors.cocoaDeep,
+                    )),
+              ]),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildMcqOptions(QuizQuestion q, int questionIndex) {
     final options = q.options ?? [];
     return Column(

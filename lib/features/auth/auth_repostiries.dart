@@ -34,17 +34,37 @@ class AuthService {
         AuthEndpoints.signUp,
         data: request.toJson(),
       );
-      final auth = AuthResponse.fromJson(
-          response.data as Map<String, dynamic>);
 
-      // Persist tokens immediately after registration
-      await Future.wait([
-        _storage.saveTokens(
-          accessToken:  auth.accessToken,
-          refreshToken: auth.refreshToken,
-        ),
-        _storage.saveUserData(jsonEncode(auth.user.toJson())),
-      ]);
+      // Register returns {"message": "Success"} — no token yet
+      // Build a minimal auth response so the app can proceed to verify email
+      final data = response.data as Map<String, dynamic>;
+      final token = data['token']?.toString() ?? data['access_token']?.toString() ?? '';
+
+      final auth = token.isNotEmpty
+          ? AuthResponse.fromJson(data)
+          : AuthResponse(
+              user: UserModel(
+                id: '',
+                firstName: request.toJson()['name']?.toString().split(' ').first ?? '',
+                lastName: request.toJson()['name']?.toString().split(' ').skip(1).join(' ') ?? '',
+                email: request.email,
+              ),
+              accessToken: '',
+              refreshToken: '',
+            );
+
+      if (token.isNotEmpty) {
+        await Future.wait([
+          _storage.saveTokens(
+            accessToken: auth.accessToken,
+            refreshToken: auth.refreshToken,
+          ),
+          _storage.saveUserData(jsonEncode(auth.user.toJson())),
+        ]);
+      } else {
+        // Save email at minimum so verify screen knows who to verify
+        await _storage.saveUserData(jsonEncode(auth.user.toJson()));
+      }
       return auth;
     } on DioException catch (e) {
       throw _unwrap(e);
@@ -74,6 +94,7 @@ class AuthService {
       throw _unwrap(e);
     }
   }
+  
 
   // ── Sign Out ───────────────────────────────────────────────
 

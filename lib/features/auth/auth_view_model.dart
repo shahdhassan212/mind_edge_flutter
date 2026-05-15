@@ -1,5 +1,6 @@
 // lib/features/auth/auth_view_model.dart
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/errors/app_exception.dart';
 import '../../core/network/dio_client.dart';
@@ -29,10 +30,58 @@ final sessionProvider = FutureProvider<bool>(
 );
 
 final currentUserProvider = FutureProvider<UserModel?>((ref) async {
-  final json = await ref.watch(tokenStorageProvider).getUserData();
-  if (json == null || json.isEmpty) return null;
+  final storage = ref.watch(tokenStorageProvider);
+
+  // ── Try saved user data first
+  final userJson = await storage.getUserData();
+  if (userJson != null && userJson.isNotEmpty) {
+    try {
+      final user = UserModel.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
+      // If name is not empty, use it
+      if (user.firstName.isNotEmpty || user.email.isNotEmpty) return user;
+    } catch (_) {}
+  }
+
+  // ── Fallback: decode from JWT token
+  final token = await storage.getAccessToken();
+  if (token == null || token.isEmpty) return null;
+
   try {
-    return UserModel.fromJson(jsonDecode(json) as Map<String, dynamic>);
+    final parts = token.split('.');
+    if (parts.length != 3) return null;
+
+    String payload = parts[1];
+    switch (payload.length % 4) {
+      case 2:
+        payload += '==';
+        break;
+      case 3:
+        payload += '=';
+        break;
+    }
+    payload = payload.replaceAll('-', '+').replaceAll('_', '/');
+    final decoded = utf8.decode(base64Decode(payload));
+    final claims = jsonDecode(decoded) as Map<String, dynamic>;
+
+    const nameKey = 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name';
+    const emailKey = 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress';
+    const idKey = 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier';
+
+    final fullName = claims[nameKey]?.toString() ?? claims['name']?.toString() ?? '';
+    final email = claims[emailKey]?.toString() ?? claims['email']?.toString() ?? '';
+    final id = claims[idKey]?.toString() ?? claims['sub']?.toString() ?? '';
+    final nameParts = fullName.trim().split(' ');
+
+    final user = UserModel(
+      id: id,
+      firstName: nameParts.first,
+      lastName: nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
+      email: email,
+    );
+
+    // Save so next time we don't need to decode
+    await storage.saveUserData(jsonEncode(user.toJson()));
+    return user;
   } catch (_) {
     return null;
   }

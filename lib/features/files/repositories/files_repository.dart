@@ -15,9 +15,7 @@ class FilesRepository {
 
     final raw = (resp.data!['files'] as List<dynamic>? ?? []);
 
-    return raw
-        .map((e) => LibFile.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return raw.map((e) => LibFile.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   // ── Download file from URL to temp path ─────────────────
@@ -51,6 +49,25 @@ class FilesRepository {
     );
 
     return resp.statusCode == 200 || resp.statusCode == 201;
+  }
+
+  // ── DELETE /api/File/DeleteFile/{filename} ───────────────
+  Future<bool> deleteFile(String filename) async {
+    final resp = await _client.delete<dynamic>(
+      '/api/File/DeleteFile/$filename',
+    );
+    return resp.statusCode == 200;
+  }
+
+  // ── PUT /api/File/RenameFile ─────────────────────────────
+  // newName should be WITHOUT extension — backend adds it automatically
+  Future<bool> renameFile(String oldName, String newName) async {
+    final resp = await _client.dio.put<dynamic>(
+      '/api/File/RenameFile',
+      queryParameters: {'oldName': oldName, 'newName': newName},
+      options: Options(headers: {'accept': '*/*'}),
+    );
+    return resp.statusCode == 200;
   }
 
   String _mimeOf(String ext) {
