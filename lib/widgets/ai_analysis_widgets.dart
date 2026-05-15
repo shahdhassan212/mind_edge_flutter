@@ -1,5 +1,3 @@
-// widgets/ai_analysis_widgets.dart
-// Sub-widgets used only by AIAnalysisScreen
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -717,36 +715,36 @@ class AiDefinitionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _termColors[index % _termColors.length];
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Term chip
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Term chip — constrained width
         Container(
+          constraints: const BoxConstraints(maxWidth: 220),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: color.withOpacity(0.10),
             border: Border.all(color: color.withOpacity(0.30)),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(def.term,
-              style: TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: color)),
-        ),
-        const SizedBox(width: 10),
-        // Definition
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(def.definition,
-                style: const TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 12,
-                    color: AppColors.aiTextMuted,
-                    height: 1.5,
-                    fontWeight: FontWeight.w300)),
+          child: Text(
+            def.term,
+            style: TextStyle(
+                fontFamily: 'DM Sans',
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: color),
           ),
+        ),
+        const SizedBox(height: 5),
+        // Definition below — full width
+        Text(
+          def.definition,
+          style: const TextStyle(
+              fontFamily: 'DM Sans',
+              fontSize: 12.5,
+              color: AppColors.aiTextBody,
+              height: 1.55,
+              fontWeight: FontWeight.w300),
         ),
       ]),
     );
@@ -758,10 +756,15 @@ class AiMarkdownText extends StatelessWidget {
   final String text;
   const AiMarkdownText({super.key, required this.text});
 
+  String _normalize(String raw) => raw
+      .replaceAll(r'\n', '\n')
+      .replaceAll(r'\r', '')
+      .replaceAll('\r\n', '\n');
+
   @override
   Widget build(BuildContext context) {
     return MarkdownBody(
-      data: text,
+      data: _normalize(text),
       shrinkWrap: true,
       selectable: true,
       styleSheet: MarkdownStyleSheet(
