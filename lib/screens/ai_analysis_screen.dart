@@ -380,15 +380,12 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 13),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1A3A5C), Color(0xFF2A5298)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: AppColors.aiCardBg,
+                border: Border.all(color: AppColors.aiBorder, width: 1.5),
                 borderRadius: BorderRadius.circular(13),
                 boxShadow: [
                   BoxShadow(
-                      color: const Color(0xFF1A3A5C).withOpacity(0.35),
+                      color: AppColors.aiTextDark.withOpacity(0.10),
                       blurRadius: 14,
                       offset: const Offset(0, 4))
                 ],
@@ -399,8 +396,8 @@ class _AIAnalysisScreenState extends ConsumerState<AIAnalysisScreen> {
                         fontFamily: 'DM Sans',
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Colors.white)),
-                Text('✦', style: TextStyle(fontSize: 9, color: Color(0x88FFFFFF))),
+                        color: AppColors.aiTextDark)),
+                Text('✦', style: TextStyle(fontSize: 9, color: AppColors.aiGoldDark)),
               ]),
             ),
           ),

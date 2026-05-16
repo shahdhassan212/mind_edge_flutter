@@ -19,6 +19,7 @@ class SignInScreen extends ConsumerWidget {
           }
         });
       } else if (vm.status == SignInStatus.error && vm.errorMessage != null) {
+        vm.animKey.currentState?.onFailure();
         AppErrorSnackBar.show(context, vm.errorMessage!);
         vm.resetError();
       }

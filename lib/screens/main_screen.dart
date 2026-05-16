@@ -34,15 +34,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final planState = ref.watch(studyPlanProvider);
     final hasPlan = planState.hasPlan;
 
-    // Filter tasks: show all incomplete, and those completed within the last 24 hours
-    final allRelevantTasks = planState.dashboardTasks.where((t) {
-      if (!t.isCompleted) return true;
-      if (t.completedAt == null) return true;
-      final diff = DateTime.now().difference(t.completedAt!);
-      return diff.inHours < 24;
-    }).toList();
+    final allTasks = planState.dashboardTasks;
 
-    final tasks = allRelevantTasks.take(3).toList();
+    // Logic: Group ALL tasks by topicName, then find the FIRST topic that has incomplete tasks.
+    // This represents the "Current Active Day/Lecture".
+    final Map<String, List<DashboardTask>> groupedByTopic = {};
+    final List<String> topicOrder = [];
+
+    for (final task in allTasks) {
+      if (!groupedByTopic.containsKey(task.topicName)) {
+        groupedByTopic[task.topicName] = [];
+        topicOrder.add(task.topicName);
+      }
+      groupedByTopic[task.topicName]!.add(task);
+    }
+
+    String? activeTopic;
+    for (final topic in topicOrder) {
+      if (groupedByTopic[topic]!.any((t) => !t.isCompleted)) {
+        activeTopic = topic;
+        break;
+      }
+    }
+
+    // If everything is done, activeTopic will be null.
+    final tasksToDisplay = activeTopic != null ? groupedByTopic[activeTopic]! : <DashboardTask>[];
 
     return Scaffold(
       backgroundColor: AppColors.dashBgTop,
@@ -216,7 +232,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${allRelevantTasks.where((t) => t.isCompleted).length} of ${allRelevantTasks.length} tasks done',
+                                    '${tasksToDisplay.where((t) => t.isCompleted).length} of ${tasksToDisplay.length} tasks done',
                                     style: TextStyle(
                                       fontFamily: 'DM Sans',
                                       fontSize: 11.5,
@@ -270,7 +286,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
 
                     // ── NO PLAN: empty box
-                    if (!hasPlan || (hasPlan && allRelevantTasks.isEmpty))
+                    if (!hasPlan || (hasPlan && tasksToDisplay.isEmpty))
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
                         child: Container(
@@ -287,7 +303,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             const Text('📬', style: TextStyle(fontSize: 36)),
                             const SizedBox(height: 10),
                             Text(
-                              allRelevantTasks.isEmpty && hasPlan
+                              tasksToDisplay.isEmpty && hasPlan
                                   ? 'All caught up!'
                                   : 'No tasks for today',
                               style: TextStyle(
@@ -299,7 +315,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              allRelevantTasks.isEmpty && hasPlan
+                              tasksToDisplay.isEmpty && hasPlan
                                   ? 'You have completed all your tasks'
                                   : 'Start a plan to get your daily tasks here',
                               style: TextStyle(
@@ -313,30 +329,48 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                       ),
 
-                    // ── HAS PLAN: task list (first 3)
-                    if (hasPlan && allRelevantTasks.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-                        child: Column(
-                          children: tasks.asMap().entries.map((e) {
-                            final i = e.key;
-                            final task = e.value;
-                            return Padding(
-                              padding: EdgeInsets.only(bottom: i < tasks.length - 1 ? 7 : 0),
-                              child: DashTaskCard(
-                                taskId: task.id,
-                                done: task.isCompleted,
-                                name: task.taskName,
-                                meta: '${task.duration} · ${task.topicName}',
-                                priority: task.priority,
-                                onToggle: () =>
-                                    ref.read(studyPlanProvider.notifier).toggleTask(task.id),
+                    // ── HAS PLAN: task list (Only the current active topic)
+                    if (hasPlan && tasksToDisplay.isNotEmpty)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                            child: Text(
+                              activeTopic!.isNotEmpty ? activeTopic : "General Tasks",
+                              style: TextStyle(
+                                fontFamily: 'Syne',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.dashTextDark.withValues(alpha: 0.7),
+                                letterSpacing: 0.5,
                               ),
-                            );
-                          }).toList(),
-                        ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Column(
+                              children: tasksToDisplay.asMap().entries.map((e) {
+                                final i = e.key;
+                                final task = e.value;
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                      bottom: i < tasksToDisplay.length - 1 ? 7 : 0),
+                                  child: DashTaskCard(
+                                    taskId: task.id,
+                                    done: task.isCompleted,
+                                    name: task.taskName,
+                                    meta: task.duration,
+                                    priority: task.priority,
+                                    onToggle: () =>
+                                        ref.read(studyPlanProvider.notifier).toggleTask(task.id),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
 
                     const SizedBox(height: 8),
                   ]),

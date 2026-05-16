@@ -30,7 +30,11 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
     super.dispose();
   }
 
-  String get _levelString => _diff == 0 ? 'beginner' : 'advanced';
+  String get _levelString => switch (_diff) {
+        0 => 'beginner',
+        1 => 'intermediate',
+        _ => 'advanced',
+      };
   int get _hoursPerDay => _daily == 0
       ? 1
       : _daily == 1
@@ -102,17 +106,9 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
                           fontWeight: FontWeight.w600,
                           color: AppColors.cocoaDeep)),
                   const Spacer(),
-                  const Text('Save',
-                      style: TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.cocoa)),
+                  const SizedBox(width: 36),
                 ]),
               ),
-
-              const AuthStepBar(steps: 3, filled: 1),
-              const StepLabel('Step 1 of 3 — Subject & Goals'),
 
               Expanded(
                 child: SingleChildScrollView(
@@ -391,68 +387,66 @@ class _OptionRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           boxShadow: AppShadows.sm,
         ),
-        child: Row(children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.cocoaDeep)),
-                Text(sub,
-                    style: const TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 10.5,
-                        color: AppColors.muted,
-                        fontWeight: FontWeight.w300)),
-              ],
-            ),
-          ),
-          Row(
-            children: options
-                .asMap()
-                .map((i, label) => MapEntry(
-                      i,
-                      GestureDetector(
-                        onTap: () => onSelect(i),
-                        child: Padding(
-                          padding: EdgeInsets.only(left: i > 0 ? 5 : 0),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(
-                              gradient: i == selected ? AppGradients.ctaButton : null,
-                              color: i == selected ? null : AppColors.cocoa.withOpacity(0.1),
-                              border: Border.all(
-                                  color: i == selected
-                                      ? Colors.transparent
-                                      : AppColors.cocoa.withOpacity(0.18)),
-                              borderRadius: BorderRadius.circular(100),
-                              boxShadow: i == selected
-                                  ? [
-                                      BoxShadow(
-                                          color: AppColors.cocoaDeep.withOpacity(0.22),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 4))
-                                    ]
-                                  : null,
-                            ),
-                            child: Text(label,
-                                style: TextStyle(
-                                    fontFamily: 'DM Sans',
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w500,
-                                    color: i == selected ? AppColors.white : AppColors.cocoa)),
-                          ),
-                        ),
-                      ),
-                    ))
-                .values
-                .toList(),
-          ),
-        ]),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title + subtitle
+            Text(title,
+                style: const TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.cocoaDeep)),
+            const SizedBox(height: 2),
+            Text(sub,
+                style: const TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 10.5,
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w300)),
+            const SizedBox(height: 10),
+            // Options as full-width column
+            ...options.asMap().entries.map((e) {
+              final i = e.key;
+              final label = e.value;
+              final on = i == selected;
+              return Padding(
+                padding: EdgeInsets.only(bottom: i < options.length - 1 ? 7 : 0),
+                child: GestureDetector(
+                  onTap: () => onSelect(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      gradient: on ? AppGradients.ctaButton : null,
+                      color: on ? null : AppColors.cocoa.withOpacity(0.07),
+                      border: Border.all(
+                          color: on ? Colors.transparent : AppColors.cocoa.withOpacity(0.18)),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: on
+                          ? [
+                              BoxShadow(
+                                  color: AppColors.cocoaDeep.withOpacity(0.22),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4))
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: on ? AppColors.white : AppColors.cocoa),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
       );
 }

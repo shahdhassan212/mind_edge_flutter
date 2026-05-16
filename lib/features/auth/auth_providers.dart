@@ -118,13 +118,25 @@ class SignInViewModel extends ChangeNotifier {
     final email = emailCtrl.text.trim();
     final password = passwordCtrl.text.trim();
 
-    if (email.isEmpty || password.isEmpty) return 'Please fill in all fields.';
-    if (!email.contains('@')) return 'Please enter a valid email.';
-    if (password.length < 6) return 'Password must be at least 6 characters.';
+    if (email.isEmpty || password.isEmpty) {
+      return 'Please fill in all fields.';
+    }
 
+    if (!email.contains('@')) {
+      return 'Please enter a valid email.';
+    }
+
+    if (password.length < 6) {
+      return 'Password must be at least 6 characters.';
+    }
+
+    // لازم يحتوي على حرف ورقم
     final hasLetter = RegExp(r'[A-Za-z]').hasMatch(password);
     final hasNumber = RegExp(r'[0-9]').hasMatch(password);
-    if (!hasLetter || !hasNumber) return 'Password must contain letters and numbers.';
+
+    if (!hasLetter || !hasNumber) {
+      return 'Password must contain letters and numbers.';
+    }
 
     return null;
   }
@@ -251,15 +263,28 @@ class SignUpViewModel extends ChangeNotifier {
         passwordCtrl.text.isEmpty) {
       return 'Please fill in all fields.';
     }
-    if (!emailCtrl.text.contains('@')) return 'Please enter a valid email.';
-    if (passwordStrength < 2) return 'Please choose a stronger password.';
+
+    if (!emailCtrl.text.contains('@')) {
+      return 'Please enter a valid email.';
+    }
+
+    if (passwordStrength < 2) {
+      return 'Please choose a stronger password.';
+    }
 
     final password = passwordCtrl.text.trim();
+
     final hasLetter = RegExp(r'[A-Za-z]').hasMatch(password);
     final hasNumber = RegExp(r'[0-9]').hasMatch(password);
-    if (!hasLetter || !hasNumber) return 'Password must contain letters and numbers.';
 
-    if (!termsAccepted) return 'Please accept the Terms of Service.';
+    if (!hasLetter || !hasNumber) {
+      return 'Password must contain letters and numbers.';
+    }
+
+    if (!termsAccepted) {
+      return 'Please accept the Terms of Service.';
+    }
+
     return null;
   }
 
@@ -589,6 +614,7 @@ final forgotNewPassVMProvider = ChangeNotifierProvider.autoDispose(
     authVM: ref.read(authViewModelProvider.notifier),
   ),
 );
+
 class VerifyEmailViewModel extends ChangeNotifier {
   VerifyEmailViewModel({required this.email, required AuthViewModel authVM}) : _authVM = authVM {
     for (final n in focusNodes) {

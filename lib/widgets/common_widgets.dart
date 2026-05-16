@@ -223,36 +223,18 @@ class AppLogo extends StatelessWidget {
   }
 }
 
-// ─── Onboarding Top Bar (Logo + Skip) ─────────────────────────
+// ─── Onboarding Top Bar (Logo only) ───────────────────────────
 class ObTopBar extends StatelessWidget {
-  final VoidCallback? onSkip;
   final bool isSmall;
-  const ObTopBar({super.key, this.onSkip, this.isSmall = false});
+  const ObTopBar({super.key, this.isSmall = false});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.fromLTRB(28, isSmall ? 6 : 10, 28, 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const AppLogo(),
-          GestureDetector(
-            onTap:
-                onSkip ?? () => Navigator.pushNamedAndRemoveUntil(context, '/signin', (_) => false),
-            child: const Padding(
-              padding: EdgeInsets.all(8),
-              child: Text(
-                'Skip',
-                style: TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 13,
-                  color: AppColors.muted,
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [AppLogo()],
       ),
     );
   }

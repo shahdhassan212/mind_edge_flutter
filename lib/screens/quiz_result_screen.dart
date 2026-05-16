@@ -45,19 +45,7 @@ class QuizResultScreen extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           color: AppColors.cocoaDeep)),
                   const Spacer(),
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.55),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFB48C50).withOpacity(0.16)),
-                      boxShadow: AppShadows.sm,
-                    ),
-                    child: const Center(
-                      child: Text('↑', style: TextStyle(fontSize: 14, color: AppColors.cocoa)),
-                    ),
-                  ),
+                  const SizedBox(width: 36),
                 ]),
               ),
 
