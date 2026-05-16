@@ -41,14 +41,24 @@ class KochaloLoginAnimationWidgetState extends State<KochaloLoginAnimationWidget
   void _wireInputs(StateMachineController ctrl) {
     _isCheking = ctrl.findInput<bool>('isCheking') as SMIBool?;
     _isHandUp = ctrl.findInput<bool>('isHandUp') as SMIBool?;
-    _trigSuccess = ctrl.findInput<bool>('trigSuccess') as SMITrigger?;
-    _trigFail = ctrl.findInput<bool>('trigFail') as SMITrigger?;
     _numLook = ctrl.findInput<double>('look') as SMINumber?;
+
+    // SMITrigger is not a bool — must search by type, not findInput<bool>
+    _trigSuccess = ctrl.inputs
+        .whereType<SMITrigger>()
+        .cast<SMITrigger?>()
+        .firstWhere((i) => i?.name == 'trigSuccess', orElse: () => null);
+    _trigFail = ctrl.inputs
+        .whereType<SMITrigger>()
+        .cast<SMITrigger?>()
+        .firstWhere((i) => i?.name == 'trigFail', orElse: () => null);
 
     debugPrint('Kochalo Inputs Wired: '
         'check: ${_isCheking != null}, '
         'hands: ${_isHandUp != null}, '
-        'look: ${_numLook != null}');
+        'look: ${_numLook != null}, '
+        'success: ${_trigSuccess != null}, '
+        'fail: ${_trigFail != null}');
   }
 
   @override
@@ -56,7 +66,6 @@ class KochaloLoginAnimationWidgetState extends State<KochaloLoginAnimationWidget
     _ctrl?.dispose();
     super.dispose();
   }
-
 
   void onEmailFocus() {
     _isHandUp?.value = false;

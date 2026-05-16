@@ -17,8 +17,8 @@ class StudyPlanScreen extends ConsumerStatefulWidget {
 }
 
 class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
-  final _subjectCtrl = TextEditingController(text: 'bioimformatics');
-  final _daysCtrl = TextEditingController(text: '14');
+  final _subjectCtrl = TextEditingController();
+  final _daysCtrl = TextEditingController(text: '7');
 
   int _daily = 1;
   int _diff = 0;
@@ -150,6 +150,8 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> {
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.cocoaDeep),
                               decoration: const InputDecoration(
+                                hintText: 'bioimformatics',
+                                hintStyle: TextStyle(color: (Colors.grey)),
                                 border: InputBorder.none,
                                 isDense: true,
                                 contentPadding: EdgeInsets.symmetric(vertical: 11),
